@@ -55,6 +55,7 @@ class nmpcalgorithm(Enum):
     ActiveSet1 = 3
     GeneticAlgorithm1 = 4
     ParticleSwarmOptimisation1 = 5
+    ReinforcementLearning = 6
 
 
 @unique
@@ -133,7 +134,7 @@ SimVectorUpdatePeriod = int(round(SimVectorUpdateT / SampleT)) #; //Nr. samples 
 TrendUpdateT = 1.0 #; //seconds.  The simulation period of updating trends in simulation.  
                                                  #//; HX: 30s; normal sim with cooling tower: 1s.
 TrendUpdateIterPeriod = int(round(TrendUpdateT / SampleT)) #; //Nr. of samples between update trend.
-SimTime = 3600.0*1 #; // Normal full model: 3600.0*4 ; CT alone:  64830; //seconds 3600*1;//3600*24;  135: ES004 53340 ; for 172EP004: 34440;for CT fitting: 12 hours/3hours.
+SimTime = 600.0 #; // Normal one shot: 3600.0*1.  Normal full model: 3600.0*4 ; CT alone:  64830; //seconds 3600*1;//3600*24;  135: ES004 53340 ; for 172EP004: 34440;for CT fitting: 12 hours/3hours.
 SimIterations = calcSimIterations() #; //Nr of iterations of the simulation.
 SimVectorLength = calcSimVectorLength() #;
 PlantDataSampleT = 30.0 #; //30 seconds for CT;  The sample frequency of the IP.21 data used for fitting.
@@ -143,6 +144,13 @@ SimTimeVector = initsimtimevector()
 #Calculation constants
 Epsilon = 0.00000001 #//small number that is added to a denominator in order to divide by it safely.
 ConvergeDiffFrac = 0.001 #//Fraction difference or less that will be treated as convergance.
+
+
+#Differential constants 
+limithm = 0.00001 #//0.00001; //h in the limit to zero as a multiplier for derivative calculation.
+limitjacnmpc = 0.00001  #//0.00001  h in the limit to zero as a multiplier for derivative calculation for nmpc.
+limitjacnmpcadd = 0.0001  #//h in the limit to zero as an added infinitesimal constant for derivative calculation for nmpc.
+RungaKuta = 4 #//Number of runga kuta iteration calculations for integration of the diff equations.
 
 
 #Screen constants 
@@ -554,9 +562,10 @@ DefaultInitialDelay = 0
 DefaultRunInterval = 300 #Assuming TSample is 10 sec, so then the interval would be a multiple of 
                                                     #//that.
 Defaultalphak = 1.0 #0.1; //0.1   0.001; //How much of line search delta is implemented.
-DefaultNMPCAlgorithm = nmpcalgorithm.ParticleSwarmOptimisation1 #nmpcalgorithm.ParticleSwarmOptimisation1; //nmpcalgorithm.UnconstrainedLineSearch;
+DefaultNMPCAlgorithm = nmpcalgorithm.ReinforcementLearning #nmpcalgorithm.ParticleSwarmOptimisation1; //nmpcalgorithm.UnconstrainedLineSearch;
 DefaultNMPCSigma = 0.8 #Multiplier of mubarrier for each iteration of the nmpc algorithm.
 MeanWidthNMPCGUILB = 11
+MeanWidthNMPCGUIEntry = 11
 
 #Interior Point 1 - ConstrainedLineSearch algorithm constants
 DefaultMuBarrier = 0.00000000000000001 #initial value / guess , for initialisation.
@@ -587,6 +596,11 @@ DefaultNrContinuousParticles = 20 #The total number of total solutions that will
 DefaultNrBooleanParticles = DefaultNrContinuousParticles #The total number of total solutions that will be kept in memory each iteration.
 PSOMVBoundaryBuffer = 10 #Distance from boundary that particles are put at random when they cross the boundary.
 PSOMaxBooleanSpeed = 1.0 #Max probability paramater for sigmoid function for boolean PSO.
+
+#RL constants
+DefaultRLBufferSize = 0 #I am not going to use the size at this point until the algorithm is not scaled yet.
+RLSamplesN = 100 #nr of samples to draw from buffer for training the critic.
+RLGamma = 0.95 #discount factor for RL agent
 
 
 #pidcontroller class constants -------------------------------------------------------------------------------------------------------------

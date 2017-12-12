@@ -58,6 +58,10 @@ class material(object):
                                                         #that is the data that we have on site.
 
         oldn = 0.0
+        self.hL = 0.0  #Joule/mol.  Molar enthalpy for the liquid phase, e.g. on a stage in a distillation column.
+        self.hV = 0.0 #Joule/mol.  Molar enthalpy for the vapour phase, e.g. on a stage in a distillation column.
+        self.ML = 0.0  #moles.  Total molar liquid hold-up.
+        self.MV = 0.0  #moles.  Total molar vapour hold-up.
         self.composition = list() #list of component objects.  mass in kg for each component in the material
         for i in range(len(globe.fluidpackage)):
             if (globe.fluidpackage[i].n != 0):
@@ -213,7 +217,7 @@ class material(object):
         self.umolar.v = materialcopyfrom.umolar.v  #; //Joule/mol.  Molar internal energy.
         self.umolarL = copy.deepcopy(materialcopyfrom.umolarL) #Array.Copy(materialcopyfrom.umolarL, umolarL, materialcopyfrom.umolarL.Length); //Joule/mol.  Molar internal energy for the total liquid phase.
         self.umolarV = copy.deepcopy(materialcopyfrom.umolarV) #Array.Copy(materialcopyfrom.umolarV, umolarV, materialcopyfrom.umolarV.Length); //Joule/mol.  Molar internal energy for the total vapour phase.
-        totalumolar = materialcopyfrom.totalumolar; #this one was a local var in the C#//last calculation of the total vmolar;
+        self.totalumolar = materialcopyfrom.totalumolar; #this one was a local var in the C#//last calculation of the total vmolar;
         self.umolarideal = copy.deepcopy(materialcopyfrom.umolarideal) #  Array.Copy(materialcopyfrom.umolarideal, umolarideal, materialcopyfrom.umolarideal.Length); //Joule/mol.  Molar internal energy for the ideal gas case.
         self.fugacityL = copy.deepcopy(materialcopyfrom.fugacityL) #Array.Copy(materialcopyfrom.fugacityL, fugacityL, materialcopyfrom.fugacityL.Length); //fugacity per component for the liquid phase.
         self.fugacityV = copy.deepcopy(materialcopyfrom.fugacityV) #Array.Copy(materialcopyfrom.fugacityV, fugacityV, materialcopyfrom.fugacityV.Length); //fugacity per component for the vapour phase.
@@ -229,8 +233,8 @@ class material(object):
         self.Tr = copy.deepcopy(materialcopyfrom.Tr) # Array.Copy(materialcopyfrom.Tr, Tr, materialcopyfrom.Tr.Length); //reduced temperature.
         self.acomp = copy.deepcopy(materialcopyfrom.acomp) #  Array.Copy(materialcopyfrom.acomp, acomp, materialcopyfrom.acomp.Length); //Cubic equation for compressibility factor coeficients.
         self.bcomp = copy.deepcopy(materialcopyfrom.bcomp) #Array.Copy(materialcopyfrom.bcomp, bcomp, materialcopyfrom.bcomp.Length); //Cubic equation for compressibility factor coeficients.
-        self.ccomp = copy.deeopcopy(materialcopyfrom.ccomp) # Array.Copy(materialcopyfrom.ccomp, ccomp, materialcopyfrom.ccomp.Length); //Cubic equation for compressibility factor coeficients.
-        self.dcomp = copy.deeopcopy(materialcopyfrom.dcomp) #  Array.Copy(materialcopyfrom.dcomp, dcomp, materialcopyfrom.dcomp.Length); //Cubic equation for compressibility factor coeficients.
+        self.ccomp = copy.deepcopy(materialcopyfrom.ccomp) # Array.Copy(materialcopyfrom.ccomp, ccomp, materialcopyfrom.ccomp.Length); //Cubic equation for compressibility factor coeficients.
+        self.dcomp = copy.deepcopy(materialcopyfrom.dcomp) #  Array.Copy(materialcopyfrom.dcomp, dcomp, materialcopyfrom.dcomp.Length); //Cubic equation for compressibility factor coeficients.
         self.bs = materialcopyfrom.bs#; #//Used in scarlet cubic solver. bs for bscarlet, This is for another cubic solver: http://home.scarlet.be/~ping1339/cubic.htm
         self.cs = materialcopyfrom.cs#; //Used in scarlet cubic solver.
         self.ds = materialcopyfrom.ds#; //Used in scarlet cubic solver.
@@ -249,7 +253,7 @@ class material(object):
         self.a = copy.deepcopy(materialcopyfrom.a) #Array.Copy(materialcopyfrom.a, a, materialcopyfrom.a.Length); //used to solve the cubid equation for Z by making use of an alternative closed form formulat for them.
         self.Qc = copy.deepcopy(materialcopyfrom.Qc) #Array.Copy(materialcopyfrom.Qc, Qc, materialcopyfrom.Qc.Length); //used in alternative formula.
         self.Rc = copy.deepcopy(materialcopyfrom.Rc) #Array.Copy(materialcopyfrom.Rc, Rc, materialcopyfrom.Rc.Length); //used in alternative formula.
-        self.Dc = copy.deepcopy(aterialcopyfrom.Dc) # Array.Copy(materialcopyfrom.Dc, Dc, materialcopyfrom.Dc.Length); //used in alternative formula.
+        self.Dc = copy.deepcopy(materialcopyfrom.Dc) # Array.Copy(materialcopyfrom.Dc, Dc, materialcopyfrom.Dc.Length); //used in alternative formula.
         self.Sc = copy.deepcopy(materialcopyfrom.Sc) #Array.Copy(materialcopyfrom.Sc, Sc, materialcopyfrom.Sc.Length); //used in alternative formula.
         self.Tc = copy.deepcopy(materialcopyfrom.Tc) #Array.Copy(materialcopyfrom.Tc, Tc, materialcopyfrom.Tc.Length); //used in alternative formula.
         self.Cp = copy.deepcopy(materialcopyfrom.Cp)  # Array.Copy(materialcopyfrom.Cp, Cp, materialcopyfrom.Cp.Length); //Heat capacity of constant pressure for an ideal gas type scenario per component.
@@ -292,7 +296,7 @@ class material(object):
 
     def init(self, acomposition, aTemp, aV, aP, af):
             #public void init(List<component> acomposition, double aTemp, double aV, double aP, double af)
-        #//phase = global.MaterialInitPhase;
+        self.phase = globe.MaterialInitPhase
 
         self.composition = []
         for i in range(len(acomposition)):
@@ -332,9 +336,17 @@ class material(object):
         #//    Cc[i] = new complex(0, 0);
         #//}
 
+
+        self.volumeofonemole = 0.0
         self.Cp = [0.0]*len(self.composition)
         self.totalCp = 0
 
+        self.hL = 0.0  #Joule/mol.  Molar enthalpy for the liquid phase, e.g. on a stage in a distillation column.
+        self.hV = 0.0 #Joule/mol.  Molar enthalpy for the vapour phase, e.g. on a stage in a distillation column.
+        self.ML = 0.0  #moles.  Total molar liquid hold-up.
+        self.MV = 0.0  #moles.  Total molar vapour hold-up.
+
+        self.totalumolar = 0.0
         self.umolarL = [0.0]*len(self.composition)
         self.umolarV = [0.0]*len(self.composition)
         self.umolarideal = [0.0]*len(self.composition)

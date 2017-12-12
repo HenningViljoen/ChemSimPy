@@ -27,7 +27,7 @@ class simulation(object):
 
     def simulationcopyconstructor(self, simcopyfrom):   #simulation simcopyfrom
         self.initsimulation()
-        #self.copyfrom(simcopyfrom)
+        self.copyfrom(simcopyfrom)
 
 
     def initsimulation(self):
@@ -98,11 +98,11 @@ class simulation(object):
                     obj.copyfrom(simcopyfrom.unitops[i])
                     self.unitops.append(obj)
                 elif simcopyfrom.unitops[i].objecttype == globe.objecttypes.Valve:
-                    obj = valve(0, 0.0, 0.0, 0.0, 0.0)
+                    obj = valve(0, 0.0, 0.0)
                     obj.copyfrom(simcopyfrom.unitops[i])
                     self.unitops.append(obj)
                 elif simcopyfrom.unitops[i].objecttype == globe.objecttypes.Tank:
-                    obj = tank(0, 0.0, 0.0, 0.0, 0.0, 0.0)
+                    obj = tank(0, 0.0, 0.0)
                     obj.copyfrom(simcopyfrom.unitops[i])
                     self.unitops.append(obj)
                 else:
@@ -192,7 +192,7 @@ class simulation(object):
         #if (nmpccontrollers == null) { nmpccontrollers = new List<nmpc>(); } #//THIS LINE SHOULD AT SOME POINT BE DELETED WHEN THE MODEL FILE HAS 
                                                                                     #//BEEN RECREATED WITH THE LATEST VERSION OF THIS CLASS.
         #if (blocks == null) { blocks = new List<block>(); }
-        #for (int i = 0; i < nmpccontrollers.Count; i++) { nmpccontrollers[i].update(simi, true); }
+        for i in range(len(self.nmpccontrollers)): self.nmpccontrollers[i].update(self.simi, True)
             
         self.simulateplant(True)
 

@@ -7,7 +7,7 @@ import utilities as utilities
 from valveproperties import valveproperties
 
 class valve(unitop.unitop):
-    def __init__(self, anr, ax, ay, aCv, aop):
+    def __init__(self, anr, ax, ay, aCv = globe.ValveDefaultCv, aop = globe.ValveDefaultOpening):
                 #public valve(int anr, double ax, double ay, double aCv, double aop)
                 #: base(anr, ax, ay, 1, 1)
         super(valve, self).__init__(anr, ax, ay, 1, 1)
@@ -37,12 +37,13 @@ class valve(unitop.unitop):
 
     def initvalve(self, anr, ax, ay, aCv, aop):
                 #public void initvalve(int anr, double ax, double ay, double aCv, double aop)
+        
         self.objecttype = globe.objecttypes.Valve
 
         self.deltapressure = controlvar.controlvar()
         self.op = controlvar.controlvar()
 
-        self.name = str(self.nr) + " " + str(self.objecttype)
+        self.name = 'Valve ' + str(self.nr)
 
         self.controlpropthisclass = []
         self.controlpropthisclass = ["deltapressure", "op"]
@@ -108,7 +109,12 @@ class valve(unitop.unitop):
             self.mat.T.v = self.inflow[0].mat.T.v
             self.massflow.v = self.inflow[0].massflow.v
             self.actualvolumeflow.v = self.massflow.v/self.mat.density.v
-            self.deltapressurenew = math.pow(self.actualvolumeflow.v / (self.Cv * math.pow(globe.ValveEqualPercR, self.op.v - 1)), 2)
+            #print(self.actualvolumeflow.v)
+            #print(self.op.v)
+            #print(self.Cv)
+            #print(globe.ValveEqualPercR)
+            self.deltapressurenew = math.pow(self.actualvolumeflow.v / \
+                (self.Cv * math.pow(globe.ValveEqualPercR, self.op.v - 1)), 2)
             self.ddt(simi)
             self.deltapressure.v += self.ddeltapressuredt * globe.SampleT       
             self.inflow[0].mat.P.v = self.outflow[0].mat.P.v + self.deltapressure.v   

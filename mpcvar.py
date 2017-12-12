@@ -3,7 +3,7 @@ import globe as globe
 
 
 class mpcvar:
-    def __init__(self, avar, aname, atarget, aweight, amin = 0, amax = 0):
+    def __init__(self, avar, aname, atarget, aweight, amin = 0.0, amax = 0.0):
        #public mpcvar(controlvar avar, string aname, double atarget, double aweight, double amin = 0, double amax = 0)
         self.var = avar #controlvar
         self.name = aname #string
@@ -37,8 +37,15 @@ class mpcvar:
         return (self.var.v - self.min) / (self.max - self.min + globe.Epsilon)
 
 
+    def targetfracofrange(self): #returns the fraction of range of the Engineering Unit MV or CV
+        return (self.target.v - self.min) / (self.max - self.min + globe.Epsilon)
+
+
     def rangetoeu(self, frac): #public double rangetoeu(double frac)
                         #converts a fraction value for the variable to its Engineering Unit form.
+        #print(frac)
+        #print(self.min)
+        #print(self.max)
         return frac * (self.max - self.min) + self.min
 
 

@@ -173,6 +173,7 @@ class application(tk.Frame):
         self.canvas.bind("<B1-Motion>", self.mousemoveleftbutton)
         self.canvas.bind('<Motion>', self.mousemove)
         self.canvas.bind("<Button-1>", self.mouseleftbutton)
+        self.canvas.bind('<Double-Button-1>', self.mouserightbutton)
         self.canvas.bind('<space>',  self.mouserightbutton)
         self.canvas.bind('<Button-2>',  self.mouserightbutton)
         self.canvas.bind('<Button-3>',  self.mouserightbutton)

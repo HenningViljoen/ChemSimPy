@@ -5,6 +5,8 @@ from mpcvar import mpcvar
 from simulation import simulation
 from point import point
 from nmpcproperties import nmpcproperties
+from nmpcrlsnapshot import nmpcrlsnapshot
+from sklearn.neural_network import MLPRegressor
 import sys
 import numpy as np
 import random
@@ -38,6 +40,7 @@ class nmpc(baseclass):
         self.algorithm = globe.DefaultNMPCAlgorithm #The NMPC algorithm that will be used in this controller
 
         self.callingsimi = 0  #The simulation index in the calling simulation object.
+        self.controlleri = -1 #The number of times that the controller has executed.
         self.cvmaster = list() #public List<mpcvar> cvmaster; //This List needs to point to mastersim
         #//mvsim0 = new List<mpcvar>();
         #//mvsim1 = new List<mpcvar>();
@@ -48,6 +51,7 @@ class nmpc(baseclass):
         self.N = globe.DefaultN  #Optimisation horizon
         self.initialdelay = globe.DefaultInitialDelay #The amount of iterations of the total simulation from T0 to the first execution of nmpc.
         self.runinterval = globe.DefaultRunInterval #The amount of iterations of the total simulation between runs of the NMPC.
+        self.controllerhistorylength = int(globe.SimIterations/self.runinterval)
         self.mastersim = asim #simulation object.  This will be copied from the master sim each time update method is run initiated
     
         self.sim0 = simulation() #pointers (sim0 and sim1) to the main simulation will need to be maintained in the NMPC in order to run the 
@@ -93,8 +97,8 @@ class nmpc(baseclass):
         self.Zmatrix = np.matrix(np.zeros((self.nrinequalityconstraints, self.nrinequalityconstraints))) #//Lagrange matrix.
         self.mubarrier = globe.DefaultMuBarrier  #mu value barrier parameter in the algorithm.
         for i in range(self.nrinequalityconstraints):
-            self.svector.m[i][0] = self.constraintvectorlinesearch.m[i][0] * globe.DefaultsvalueMultiplier
-            self.zvector.m[i][0] = self.mubarrier / (self.svector.m[i][0] + globe.Epsilon)
+            self.svector[i,0] = self.constraintvectorlinesearch[i,0] * globe.DefaultsvalueMultiplier
+            self.zvector[i,0] = self.mubarrier / (self.svector[i,0] + globe.Epsilon)
         self.updateSmatrix()
         self.updateZmatrix()
         
@@ -120,11 +124,10 @@ class nmpc(baseclass):
         self.Bvectoractiveset1 = np.matrix(np.zeros((self.sizeactiveset1, 1))) #This is the B vector of the AX = B active set 1 system.
         self.nractiveconstraints = 0 #int
 
-        #//Genetic Algorithm 1 :
+        #//Init depending on type of algorithm to be used:
         if (self.algorithm == globe.nmpcalgorithm.GeneticAlgorithm1): self.initgeneticalgorithm1()
-
-        #//Particle Swarm Optimisation 1:
-        if (self.algorithm == globe.nmpcalgorithm.ParticleSwarmOptimisation1): self.initparticleswarmoptimisation1()
+        elif (self.algorithm == globe.nmpcalgorithm.ParticleSwarmOptimisation1): self.initparticleswarmoptimisation1()
+        elif (self.algorithm == globe.nmpcalgorithm.ReinforcementLearning): self.initrl()
 
 
     #Unconstrained optimisation -------------------------------------------------------------------------------------------------------------
@@ -360,7 +363,8 @@ class nmpc(baseclass):
             self.calcconstraintvector()
             for r in range(len(self.mvmaster)):
                 self.AInequality[r][c] = (self.constraintvectorlinesearch[r,0] - C0[r,0]) / h
-                self.AInequality[r + self.mvmaster.Count,c] = (self.constraintvectorlinesearch[r + self.mvmaster.Count,0] - C0[r + mvmaster.Count,0]) / h
+                self.AInequality[r + len(self.mvmaster),c] = (self.constraintvectorlinesearch[r + \
+                    len(self.mvmaster),0] - C0[r + len(self.mvmaster),0]) / h
             self.mvmaster[c].var.v = oldmv
             #//calcconstraintvector();
 
@@ -370,7 +374,7 @@ class nmpc(baseclass):
         #//The minimum constraints will be defined first, and then the maximum.
         for i in range(len(self.mvmaster)):
             self.constraintvectorlinesearch[i,0] = self.mvmaster[i].var.v - self.mvmaster[i].min
-            self.constraintvectorlinesearch[i + self.mvmaster.Count,0] = self.mvmaster[i].max - self.mvmaster[i].var.v
+            self.constraintvectorlinesearch[i + len(self.mvmaster),0] = self.mvmaster[i].max - self.mvmaster[i].var.v
 
 
     #//update methods  ------------------------------------------------------------------------------------------------------------------------------
@@ -429,6 +433,7 @@ class nmpc(baseclass):
     def update(self, simi, historise):  #public override void update(int simi, bool historise)
         if ((simi - self.initialdelay) % self.runinterval == 0):
             self.callingsimi = simi
+            self.controlleri += 1
             if (self.algorithm == globe.nmpcalgorithm.UnconstrainedLineSearch):
                 self.J0 = self.calcobjectivefunction()
                 self.mk = self.J0
@@ -468,6 +473,8 @@ class nmpc(baseclass):
                 self.assignparticlefitness()
                 self.bestparticle()
                 self.implementparticle()
+            elif self.algorithm == globe.nmpcalgorithm.ReinforcementLearning:
+                self.updaterl()
             #//for (int j = 0; j < mvmaster.Count; j++) //The mastersim's mv list will now be copied from the mvmatrix' first column.
             #//{
             #//    mvmaster[j].var.v = mvmatrix[j][1]; //T1 is the one to implement.  T0 is the current value.
@@ -475,7 +482,64 @@ class nmpc(baseclass):
 
 
 
-      
+# Reinforcement Learning algorithm -------------------------------------------------------------------------------------
+
+    def initrl(self):
+        self.rlstatelength = len(self.cvmaster)*2
+        self.rlstatehalflength = len(self.cvmaster)
+        if self.rlstatelength == 0: self.rlstatelength = 2
+        self.rlactionlength = len(self.mvmaster)
+        if self.rlactionlength == 0: self.rlactionlength = 1
+        self.rlreward = 0.0 #in our case we are going to treat the reward signals at this stage as 
+        self.rlaction = np.zeros(self.rlactionlength) #the actions to be taken
+        self.rlstate = np.zeros(self.rlstatelength) #the states will be the CVs as well as their targets/setpoints. 
+                                                    #The first half othe state will be the set points, and then the CVs.
+        self.rlnewstate = self.rlstate = np.zeros(self.rlstatelength)
+        if len(self.cvmaster) > 0:
+            for i in range(self.rlstatehalflength): #will only init these SPs once the cv master list has been populated.
+                self.rlstate[i] = self.cvmaster[i].targetfracofrange()
+            for i in range(self.rlstatehalflength, self.rlstatelength):
+                self.rlstate[i] = self.cvmaster[i - self.rlstatehalflength].fracofrange()
+        if len(self.mvmaster) > 0:
+            for i in range(self.rlactionlength):
+                self.rlaction[i] = self.mvmaster[i].fracofrange()
+        colsinbuffer = self.rlstatelength + self.rlactionlength + 1 + self.rlstatelength #local int
+        self.rlbuffer = np.zeros((self.controllerhistorylength, colsinbuffer)) #at this point the buffer will just be as large as the simulation horison, will be changed later.
+        self.y = np.zeros(self.controllerhistorylength) #the list calculated rewards from the samples N from buffer R
+        self.rlcritic = MLPRegressor()
+        self.rlcritic.fit(np.ones((5,self.rlstatelength + self.rlactionlength)), np.ones((5,1)).reshape(-1, 1))
+        self.rlactor = MLPRegressor()
+        self.rlactor.fit(np.ones((5,self.rlstatelength)), np.ones((5,self.rlactionlength)))
+
+
+    def updaterl(self):
+        self.calcrewardrl()
+        for i in range(self.rlstatehalflength, self.rlstatelength):
+            self.rlnewstate[i] = self.cvmaster[i - self.rlstatehalflength].fracofrange()
+        self.rlbuffer[self.controlleri,:] = np.hstack((self.rlstate, self.rlaction, self.rlreward, self.rlnewstate))
+        self.y[self.controlleri] = self.rlreward + globe.RLGamma*\
+            self.rlcritic.predict(np.hstack((self.rlnewstate, self.rlactor.predict(self.rlnewstate))))
+
+        #self.controlleri
+
+        self.rlaction = self.rlactor.predict(self.rlnewstate)
+        for i in range(self.rlactionlength):
+            self.rlaction[i] += np.random.normal()/24.0
+            #print(self.rlaction[i])
+            if self.rlaction[i] > 1.0: self.rlaction[i] = 1.0
+            elif self.rlaction[i] < 0.0: self.rlaction[i] = 0.0
+            self.mvmaster[i].var.v = self.mvmaster[i].rangetoeu(self.rlaction[i])
+
+        self.rlstate = np.copy(self.rlnewstate)
+
+
+    def calcrewardrl(self):
+        self.rlreward = 0.0 #this reward is actually an objective to be minimised.
+        for j in range(len(self.cvmaster)):
+            self.rlreward += self.cvmaster[j].weight * \
+                        math.pow((self.cvmaster[j].var.v - self.cvmaster[j].target.v) / \
+                        (self.cvmaster[j].max - self.cvmaster[j].min + globe.Epsilon), 2) 
+
 
     #// Genetic Algorithm1 (GA) ---------------------------------------------------------------------------------------------------------------------
 
@@ -561,7 +625,8 @@ class nmpc(baseclass):
             self.mastersim.simulateplant(False)
             for j in range(len(self.cvmaster)):
                 fitness += self.cvmaster[j].weight * \
-                            math.pow((self.cvmaster[j].var.v - self.cvmaster[j].target.simvector[self.callingsimi + i]) / (self.cvmaster[j].max - self.cvmaster[j].min + globe.Epsilon), 2)  #//The cv vector will have to poin to sim1's variables.
+                        math.pow((self.cvmaster[j].var.v - self.cvmaster[j].target.simvector[self.callingsimi + i]) / \
+                        (self.cvmaster[j].max - self.cvmaster[j].min + globe.Epsilon), 2)  #//The cv vector will have to poin to sim1's variables.
 
             #//if (nractiveconstraints > 0)
             #//{
@@ -660,8 +725,8 @@ class nmpc(baseclass):
         #//nrparticles = global.DefaultNrParticles;
         self.nrcontinuousparticles = globe.DefaultNrContinuousParticles #The total number of total continuous solutions that will be kept in memory each iteration.
         self.nrbooleanparticles = globe.DefaultNrBooleanParticles #The total number of total continuous solutions that will be kept in memory each iteration.
-        self.bestsolutioncontinuousparticleindex = 0.0 #//The particle that has had the best solution to the problem so far.
-        self.bestsolutionbooleanparticleindex = 0.0 #The particle that has had the best solution to the problem so far.
+        self.bestsolutioncontinuousparticleindex = 0 #//The particle that has had the best solution to the problem so far.
+        self.bestsolutionbooleanparticleindex = 0 #The particle that has had the best solution to the problem so far.
         self.bestfitnesscontinuous = sys.float_info.max #the fitness of the best particle historically.
         self.bestfitnessboolean = sys.float_info.max #the fitness of the best particle historically.
 
@@ -775,7 +840,7 @@ class nmpc(baseclass):
 
         for i in range(self.nrcontinuousparticles):
             for j in range(len(self.mvmaster)):
-                self.mvmaster[j].var.v = self.mvmaster[j].rangetoeu(continuousparticles[i].currentmvs[j] / 100.0)
+                self.mvmaster[j].var.v = self.mvmaster[j].rangetoeu(self.continuousparticles[i].currentmvs[j] / 100.0)
 
             for j in range(len(self.mvboolmaster)):
                 #//mvboolmaster[j].var.v = Math.Round(particles[i].currentmvs[j + mvmaster.Count] / 100.0);
@@ -839,10 +904,10 @@ class nmpc(baseclass):
         maxmove = 0.0
         absdeltaoptim = 0.0
         for j in range(len(self.mvmaster)):
-            deltaoptim = (self.mvmaster[j].rangetoeu(self.continuousparticles[self.bestsolutioncontinuousparticleindex].bestmvs[j] / 100.0) - self.mvmaster[j].var.v) * \
-                    alphak
+            deltaoptim = (self.mvmaster[j].rangetoeu(self.continuousparticles[self.bestsolutioncontinuousparticleindex].\
+                bestmvs[j] / 100.0) - self.mvmaster[j].var.v) * self.alphak
             maxmove = globe.MVMaxMovePerSampleTT0 * (self.mvmaster[j].max - self.mvmaster[j].min)
-            absdeltaoptim = Math.Abs(deltaoptim)
+            absdeltaoptim = abs(deltaoptim)
             if (absdeltaoptim > maxmove):
                 deltaoptim = maxmove * (deltaoptim / absdeltaoptim)#//Keep the sign of deltaoptim, but limt abs value.
             self.mvmaster[j].var.v += deltaoptim

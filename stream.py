@@ -31,7 +31,7 @@ class stream(baseprocessclass.baseprocessclass):
     def streaminit(self, p0x, p0y, p1x, p1y):
             #private void streaminit(double p0x, double p0y, double p1x, double p1y)
         self.objecttype = globe.objecttypes.Stream
-        self.name = str(self.nr) + " " + str(self.objecttype)
+        self.name = 'Stream ' + str(self.nr)
 
         self.points = [point.point]*2
         self.points[0] = point.point(p0x, p0y)

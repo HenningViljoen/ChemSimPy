@@ -7,7 +7,8 @@ import math
 
 
 class tank(unitop):
-    def __init__(self, anr, ax, ay, afracinventory, aradius, aheight):
+    def __init__(self, anr, ax, ay, afracinventory = globe.TankInitFracInventory, \
+        aradius = globe.TankInitRadius, aheight = globe.TankInitHeight):
                 #public tank(int anr, double ax, double ay, double afracinventory, double aradius, double aheight)
                 #: base(anr, ax, ay, 1, 1)
         super(tank, self).__init__(anr, ax, ay, 1, 1)
