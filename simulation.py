@@ -214,7 +214,8 @@ class simulation(object):
     def dodetailtrends(self, plt): #detail trends for all that was checked for it.
         for i in range(len(self.unitops)): self.unitops[i].dodetailtrend(plt)
         for i in range(len(self.streams)):  self.streams[i].dodetailtrend(plt)
-        for i in range(len(self.signals)):  self.signals[i].dodetailtrend(plt)
+        for i in range(len(self.nmpccontrollers)):  self.nmpccontrollers[i].dodetailtrend(plt)
+        for i in range(len(self.signals)):  self.nmpccontrollers[i].dodetailtrend(plt)
         for i in range(len(self.pidcontrollers)): self.pidcontrollers[i].dodetailtrend(plt)
         if (self.blocks != None):
             for i in range(len(self.blocks)): self.blocks[i].dodetailtrend(plt)

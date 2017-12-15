@@ -600,7 +600,7 @@ PSOMaxBooleanSpeed = 1.0 #Max probability paramater for sigmoid function for boo
 #RL constants
 DefaultRLBufferSize = 0 #I am not going to use the size at this point until the algorithm is not scaled yet.
 RLSamplesN = 100 #nr of samples to draw from buffer for training the critic.
-RLGamma = 0.95 #discount factor for RL agent
+RLGamma = 0.2 #0.95 #discount factor for RL agent
 
 
 #pidcontroller class constants -------------------------------------------------------------------------------------------------------------

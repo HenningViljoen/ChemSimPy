@@ -484,6 +484,10 @@ class application(tk.Frame):
             if (self.sim.streams[i].highlighted):
                 self.sim.streams[i].showtrenddetail()
 
+        for i in range(len(self.sim.nmpccontrollers)):
+            if (self.sim.nmpccontrollers[i].highlighted):
+                self.sim.nmpccontrollers[i].showtrenddetail()
+
 
     def deleteitems(self):
         idelete = -1

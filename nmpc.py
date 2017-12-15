@@ -7,6 +7,9 @@ from point import point
 from nmpcproperties import nmpcproperties
 from nmpcrlsnapshot import nmpcrlsnapshot
 from sklearn.neural_network import MLPRegressor
+from sklearn.pipeline import Pipeline
+from nmpcrlactortransformer import nmpcrlactortransformer
+from nmpcrlcritictransformer import nmpcrlcritictransformer
 import sys
 import numpy as np
 import random
@@ -485,12 +488,14 @@ class nmpc(baseclass):
 # Reinforcement Learning algorithm -------------------------------------------------------------------------------------
 
     def initrl(self):
+        self.rlbuffersize = self.controllerhistorylength*100
         self.rlstatelength = len(self.cvmaster)*2
         self.rlstatehalflength = len(self.cvmaster)
         if self.rlstatelength == 0: self.rlstatelength = 2
         self.rlactionlength = len(self.mvmaster)
         if self.rlactionlength == 0: self.rlactionlength = 1
         self.rlreward = 0.0 #in our case we are going to treat the reward signals at this stage as 
+        self.rlrewardtarget = np.zeros(self.rlbuffersize)
         self.rlaction = np.zeros(self.rlactionlength) #the actions to be taken
         self.rlstate = np.zeros(self.rlstatelength) #the states will be the CVs as well as their targets/setpoints. 
                                                     #The first half othe state will be the set points, and then the CVs.
@@ -504,27 +509,57 @@ class nmpc(baseclass):
             for i in range(self.rlactionlength):
                 self.rlaction[i] = self.mvmaster[i].fracofrange()
         colsinbuffer = self.rlstatelength + self.rlactionlength + 1 + self.rlstatelength #local int
-        self.rlbuffer = np.zeros((self.controllerhistorylength, colsinbuffer)) #at this point the buffer will just be as large as the simulation horison, will be changed later.
-        self.y = np.zeros(self.controllerhistorylength) #the list calculated rewards from the samples N from buffer R
-        self.rlcritic = MLPRegressor()
-        self.rlcritic.fit(np.ones((5,self.rlstatelength + self.rlactionlength)), np.ones((5,1)).reshape(-1, 1))
-        self.rlactor = MLPRegressor()
-        self.rlactor.fit(np.ones((5,self.rlstatelength)), np.ones((5,self.rlactionlength)))
+        self.rlbuffer = np.zeros((self.rlbuffersize, colsinbuffer)) #at this point the buffer will just be as large as the simulation horison, will be changed later.
+        self.rlbuffershort = np.zeros((self.rlbuffersize, self.rlstatelength + self.rlactionlength))
+        self.rlbufferstate = np.zeros((self.rlbuffersize, self.rlstatelength))
+            #this is the buffer that will be used to fit the critic with in part
+        self.y = np.zeros(self.rlbuffersize) #the list calculated rewards from the samples N from buffer R
+        self.actoroutputsimvector = np.zeros((self.rlbuffersize, self.rlactionlength))
+        self.rlcritictransformer = nmpcrlcritictransformer()
+        self.rlcritic = self.rlcritictransformer.critic
+        self.rlcriticoutputsimvector = np.zeros(self.rlbuffersize) 
+        self.rlcriticcoefs = None
+        self.rlcritic.fit(np.zeros((5,self.rlstatelength + self.rlactionlength)), np.zeros((5,1)).reshape(-1, 1))
+        self.rlactortransformer = nmpcrlactortransformer(self.rlstatehalflength, self.rlstatelength)
+        self.rlactor = self.rlactortransformer.actor
+        self.rlactor.fit(np.zeros((5,self.rlstatelength)), np.zeros((5,self.rlactionlength)))
+        self.rlactorcoefs = None
+        
 
 
     def updaterl(self):
+        print(self.controlleri)
         self.calcrewardrl()
         for i in range(self.rlstatehalflength, self.rlstatelength):
             self.rlnewstate[i] = self.cvmaster[i - self.rlstatehalflength].fracofrange()
         self.rlbuffer[self.controlleri,:] = np.hstack((self.rlstate, self.rlaction, self.rlreward, self.rlnewstate))
-        self.y[self.controlleri] = self.rlreward + globe.RLGamma*\
-            self.rlcritic.predict(np.hstack((self.rlnewstate, self.rlactor.predict(self.rlnewstate))))
-
+        self.rlbuffershort[self.controlleri,:] = np.hstack((self.rlstate, self.rlaction))
+        self.rlbufferstate[self.controlleri,:] = self.rlstate
+        criticpredictfory = self.rlcritic.predict(np.hstack((self.rlnewstate, self.rlactor.predict(self.rlnewstate))))
+        self.y[self.controlleri] = self.rlreward + globe.RLGamma*criticpredictfory
+        self.rlcriticoutputsimvector[self.controlleri] = criticpredictfory
+            
+        self.rlcriticcoefs = np.array(self.rlcritic.coefs_)
+        self.rlcritic.fit(self.rlbuffershort[:(self.controlleri+1)], self.y[:(self.controlleri+1)])
+        print('delta rlcritic.coefs_ :')
+        print(np.array(self.rlcritic.coefs_) - self.rlcriticcoefs)
+        self.rlrewardtarget[self.controlleri] = 0.0 #at this stage we are aming to get the objective func to zero
+        self.rlpipe = Pipeline([ \
+            ('rlactortransformer', self.rlactortransformer), \
+            ('rlcritictransformer', self.rlcritictransformer) ])
+        self.rlactorcoefs = np.array(self.rlactor.coefs_)
+        self.rlpipe.fit(self.rlbufferstate[:(self.controlleri+1),:], \
+            np.hstack((self.rlrewardtarget[:(self.controlleri+1)].reshape(-1, 1), \
+            np.zeros((self.controlleri+1, self.rlstatelength + self.rlactionlength - 1)))))
+        print('delta rlactor.coefs_ :')
+        print(np.array(self.rlactor.coefs_) - self.rlactorcoefs)
         #self.controlleri
 
+        #The below part of this method, will now focus on getting the action from the actor.
         self.rlaction = self.rlactor.predict(self.rlnewstate)
+        self.actoroutputsimvector[self.controlleri, :] = self.rlaction
         for i in range(self.rlactionlength):
-            self.rlaction[i] += np.random.normal()/24.0
+            self.rlaction[i] += np.random.normal()/48.0
             #print(self.rlaction[i])
             if self.rlaction[i] > 1.0: self.rlaction[i] = 1.0
             elif self.rlaction[i] < 0.0: self.rlaction[i] = 0.0
@@ -1096,12 +1131,33 @@ class nmpc(baseclass):
                 self.cvmaster[i].max = self.cvmaster[i].var.v
 
 
-    #public override void showtrenddetail(simulation asim, List<Form> detailtrendslist)
-    #{
-    #   detailtrendslist.Add(new nmpcdetail(this, asim));
-    #    detailtrendslist[detailtrendslist.Count - 1].Show();
-    #}
+    def showtrenddetail(self):
+        if not self.detailtrended:
+            self.detailtrended = True
+            self.allocatememory()
+        else:
+            self.detailtrended = False
+            self.deallocatememory()
 
+
+    def allocatememory(self):
+        pass
+
+
+    def deallocatememory(self):
+        pass
+
+
+    def dodetailtrend(self, plt):
+        if self.detailtrended:
+            x = range(self.rlbuffersize)
+            f, axarr = plt.subplots(3, sharex=True)
+            axarr[0].plot(x, self.y)
+            axarr[0].set_title('y signal history : ' + self.name)
+            axarr[1].plot(x, self.actoroutputsimvector)
+            axarr[1].set_title('actoroutputsimvector : ' + self.name)
+            axarr[2].plot(x, self.rlcriticoutputsimvector)
+            axarr[2].set_title('rlcriticoutputsimvector : ' + self.name)
 
 
     def setproperties(self, asim, aroot):  #public override void setproperties(root, simulation asim)
