@@ -6,34 +6,29 @@ import utilities as utilities
 import globe as globe
 
 
-class nmpcproperties(Dialog):
-    def __init__(self, anmpc, asim, aroot):
-        self.selectedbaseclasspv = 0 #a bunch of local ints to follow
+class pidcontrollerproperties(Dialog):
+    def __init__(self, acontroller, asim, aroot):
+        self.selectedbaseclasspv = 0
         self.selectedbaseclassop = 0
         self.selectedpv = 0
-        self.selectedcv = 0
-        self.selectedmv = 0
         self.selectedop = 0
-        self.selectedboolmv = 0
         self.baseclasstypepv = globe.baseclasstypeenum.UnitOp
         self.baseclasstypeop = globe.baseclasstypeenum.UnitOp
-        self.thenmpc = anmpc
+        self.thecontroller = acontroller
         self.thesim = asim
         
-        super(nmpcproperties, self).__init__(aroot)
+        super(pidcontrollerproperties, self).__init__(aroot)
 
         self.refreshdialogue()
 
 
     def body(self, master):
-        self.title('NMPC Controller Properties: ' + self.thenmpc.name)
+        self.title('PID Controller Properties: ' + self.thecontroller.name)
 
         tk.Label(master, text='Name').grid(row=0, sticky=tk.W)
-        tk.Label(master, text='N').grid(row=1, sticky=tk.W)
-        tk.Label(master, text='Initial delay').grid(row=2, sticky=tk.W)
-        tk.Label(master, text='Run interval').grid(row=3, sticky=tk.W)
-        tk.Label(master, text='alpha k').grid(row=4, sticky=tk.W)
-
+        tk.Label(master, text='K').grid(row=1, sticky=tk.W)
+        tk.Label(master, text='I').grid(row=2, sticky=tk.W)
+        tk.Label(master, text='D').grid(row=3, sticky=tk.W)
         
         self.e0text = tk.StringVar()
         self.e0 = tk.Entry(master, textvariable=self.e0text, width=globe.MeanWidthNMPCGUIEntry)
@@ -47,28 +42,77 @@ class nmpcproperties(Dialog):
         self.e3text = tk.StringVar()
         self.e3 = tk.Entry(master, textvariable=self.e3text, width=globe.MeanWidthNMPCGUIEntry)
         self.e3.grid(row=3, column=1)
+
+        tk.Label(master, text='SP:').grid(row=0, column=2, sticky=tk.W)
+        tk.Label(master, text='PV:').grid(row=1, column=2, sticky=tk.W)
+        tk.Label(master, text='OP:').grid(row=2, column=2, sticky=tk.W)
+
         self.e4text = tk.StringVar()
         self.e4 = tk.Entry(master, textvariable=self.e4text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e4.grid(row=4, column=1)
+        self.e4.grid(row=0, column=3)
+        self.e5text = tk.StringVar()
+        self.e5 = tk.Entry(master, textvariable=self.e5text, width=globe.MeanWidthNMPCGUIEntry)
+        self.e5.grid(row=1, column=3)
+        self.e6text = tk.StringVar()
+        self.e6 = tk.Entry(master, textvariable=self.e6text, width=globe.MeanWidthNMPCGUIEntry)
+        self.e6.grid(row=2, column=3)
 
-        tk.Label(master, text='Iterations').grid(row=1, column=2, sticky=tk.W)
-        tk.Label(master, text='Iterations').grid(row=2, column=2, sticky=tk.W)
-        tk.Label(master, text='Iterations').grid(row=3, column=2, sticky=tk.W)
+        tk.Label(master, text='SP current value').grid(row=0, column=4, sticky=tk.W)
+        tk.Label(master, text='PV current value').grid(row=1, column=4, sticky=tk.W)
+        tk.Label(master, text='OP current value').grid(row=2, column=4, sticky=tk.W)
+        tk.Label(master, text='Bias').grid(row=3, column=4, sticky=tk.W)
+
+        self.e7text = tk.StringVar()
+        self.e7 = tk.Entry(master, textvariable=self.e7text, width=globe.MeanWidthNMPCGUIEntry)
+        self.e7.grid(row=0, column=5)
+        self.e8text = tk.StringVar()
+        self.e8 = tk.Entry(master, textvariable=self.e8text, width=globe.MeanWidthNMPCGUIEntry)
+        self.e8.grid(row=1, column=5)
+        self.e9text = tk.StringVar()
+        self.e9 = tk.Entry(master, textvariable=self.e9text, width=globe.MeanWidthNMPCGUIEntry)
+        self.e9.grid(row=2, column=5)
+        self.e10text = tk.StringVar()
+        self.e10 = tk.Entry(master, textvariable=self.e10text, width=globe.MeanWidthNMPCGUIEntry)
+        self.e10.grid(row=3, column=5)
+
+        tk.Label(master, text='SP min value:').grid(row=0, column=6, sticky=tk.W)
+        tk.Label(master, text='PV min value:').grid(row=1, column=6, sticky=tk.W)
+        tk.Label(master, text='OP min value:').grid(row=2, column=6, sticky=tk.W)
+
+        self.e11text = tk.StringVar()
+        self.e11 = tk.Entry(master, textvariable=self.e11text, width=globe.MeanWidthNMPCGUIEntry)
+        self.e11.grid(row=0, column=7)
+        self.e12text = tk.StringVar()
+        self.e12 = tk.Entry(master, textvariable=self.e12text, width=globe.MeanWidthNMPCGUIEntry)
+        self.e12.grid(row=1, column=7)
+        self.e13text = tk.StringVar()
+        self.e13 = tk.Entry(master, textvariable=self.e13text, width=globe.MeanWidthNMPCGUIEntry)
+        self.e13.grid(row=2, column=7)
+
+        tk.Label(master, text='SP max value:').grid(row=0, column=8, sticky=tk.W)
+        tk.Label(master, text='PV max value:').grid(row=1, column=8, sticky=tk.W)
+        tk.Label(master, text='OP max value:').grid(row=2, column=8, sticky=tk.W)
+
+        self.e14text = tk.StringVar()
+        self.e14 = tk.Entry(master, textvariable=self.e14text, width=globe.MeanWidthNMPCGUIEntry)
+        self.e14.grid(row=0, column=9)
+        self.e15text = tk.StringVar()
+        self.e15 = tk.Entry(master, textvariable=self.e15text, width=globe.MeanWidthNMPCGUIEntry)
+        self.e15.grid(row=1, column=9)
+        self.e16text = tk.StringVar()
+        self.e16 = tk.Entry(master, textvariable=self.e16text, width=globe.MeanWidthNMPCGUIEntry)
+        self.e16.grid(row=2, column=9)
+
+        #tk.Label(master, text='Iterations').grid(row=1, column=2, sticky=tk.W)
+        #tk.Label(master, text='Iterations').grid(row=2, column=2, sticky=tk.W)
+        #tk.Label(master, text='Iterations').grid(row=3, column=2, sticky=tk.W)
         
-        
-        tk.Label(master, text='CV Object').grid(row=5, column=0, sticky=tk.W)
-        tk.Label(master, text='CV Property').grid(row=5, column=1, sticky=tk.W)
-        tk.Label(master, text='CV List').grid(row=5, column=2, sticky=tk.W)
-        tk.Label(master, text='CV Target').grid(row=5, column=3, sticky=tk.W)
-        tk.Label(master, text='CV Weight').grid(row=5, column=4, sticky=tk.W)
-        tk.Label(master, text='CV EU low').grid(row=5, column=5, sticky=tk.W)
-        tk.Label(master, text='CV EU high').grid(row=5, column=6, sticky=tk.W)
-        tk.Label(master, text='CV target source').grid(row=5, column=7, sticky=tk.W)
-        tk.Label(master, text='MV Object').grid(row=5, column=8, sticky=tk.W)
-        tk.Label(master, text='MV Property').grid(row=5, column=9, sticky=tk.W)
-        tk.Label(master, text='MV List (c)').grid(row=5, column=10, sticky=tk.W)
-        tk.Label(master, text='MV Min').grid(row=5, column=11, sticky=tk.W)
-        tk.Label(master, text='MV Max').grid(row=5, column=12, sticky=tk.W)
+        tk.Label(master, text='PV Object').grid(row=5, column=0, sticky=tk.W)
+        tk.Label(master, text='PV Property').grid(row=5, column=1, sticky=tk.W)
+
+        tk.Label(master, text='OP Object').grid(row=5, column=2, sticky=tk.W)
+        tk.Label(master, text='OP Property').grid(row=5, column=3, sticky=tk.W)
+        tk.Label(master, text='Direction').grid(row=5, column=4, sticky=tk.W)
 
         self.listbox0 = tk.Listbox(master, width=globe.MeanWidthNMPCGUILB, exportselection=False)
         self.listbox0.grid(row=6, column=0)
@@ -81,126 +125,10 @@ class nmpcproperties(Dialog):
         self.listbox2.bind('<<ListboxSelect>>', self.listbox2select)
         self.listbox3 = tk.Listbox(master, width=globe.MeanWidthNMPCGUILB, exportselection=False)
         self.listbox3.grid(row=6, column=3)
+        self.listbox3.bind('<<ListboxSelect>>', self.listbox3select)
         self.listbox4 = tk.Listbox(master, width=globe.MeanWidthNMPCGUILB, exportselection=False)
         self.listbox4.grid(row=6, column=4)
-        self.listbox5 = tk.Listbox(master, width=globe.MeanWidthNMPCGUILB, exportselection=False)
-        self.listbox5.grid(row=6, column=5)
-        self.listbox6 = tk.Listbox(master, width=globe.MeanWidthNMPCGUILB, exportselection=False)
-        self.listbox6.grid(row=6, column=6)
-        self.listbox7 = tk.Listbox(master, width=globe.MeanWidthNMPCGUILB, exportselection=False)
-        self.listbox7.grid(row=6, column=7)
-        self.listbox8 = tk.Listbox(master, width=globe.MeanWidthNMPCGUILB, exportselection=False)
-        self.listbox8.grid(row=6, column=8)
-        self.listbox8.bind('<<ListboxSelect>>', self.listbox8select)
-        self.listbox9 = tk.Listbox(master, width=globe.MeanWidthNMPCGUILB, exportselection=False)
-        self.listbox9.grid(row=6, column=9)
-        self.listbox10 = tk.Listbox(master, width=globe.MeanWidthNMPCGUILB, exportselection=False)
-        self.listbox10.grid(row=6, column=10)
-        self.listbox10.bind('<<ListboxSelect>>', self.listbox10select)
-        self.listbox11 = tk.Listbox(master, width=5, exportselection=False)
-        self.listbox11.grid(row=6, column=11)
-        self.listbox12 = tk.Listbox(master, width=5, exportselection=False)
-        self.listbox12.grid(row=6, column=12)
-
-        self.addcvbutton = tk.Button(self.theframe,
-                             text = 'Add CV', command = self.addcvbuttonevent)
-        self.addcvbutton.grid(row = 7, column = 2, pady = 2, padx = 3, sticky = tk.NW)
-
-        self.deletecvbutton = tk.Button(self.theframe,
-                             text = 'Delete CV', command = self.deletecvbuttonevent)
-        self.deletecvbutton.grid(row = 7, column = 3, pady = 2, padx = 3, sticky = tk.NW)
-
-        self.selectfilebutton = tk.Button(self.theframe,
-                             text = 'File CV target', command = self.selectfilebuttonevent)
-        self.selectfilebutton.grid(row = 7, column = 4, pady = 2, padx = 3, sticky = tk.NW)
-
-        tk.Label(master, text='Current value').grid(row=8, column=1, sticky=tk.W)
-        tk.Label(master, text='Min').grid(row=9, column=1, sticky=tk.W)
-        tk.Label(master, text='Max').grid(row=10, column=1, sticky=tk.W)
-
-        self.e5text = tk.StringVar()
-        self.e5 = tk.Entry(master, textvariable=self.e5text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e5.grid(row=8, column=2)
-        self.e6text = tk.StringVar()
-        self.e6 = tk.Entry(master, textvariable=self.e6text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e6.grid(row=9, column=2)
-        self.e7text = tk.StringVar()
-        self.e7 = tk.Entry(master, textvariable=self.e7text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e7.grid(row=10, column=2)
-
-        tk.Label(master, text='Target value').grid(row=8, column=3, sticky=tk.W)
-        tk.Label(master, text='Weight').grid(row=9, column=3, sticky=tk.W)
-        tk.Label(master, text='Min').grid(row=10, column=3, sticky=tk.W)
-        tk.Label(master, text='Max').grid(row=11, column=3, sticky=tk.W)
-
-        self.e8text = tk.StringVar()
-        self.e8 = tk.Entry(master, textvariable=self.e8text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e8.grid(row=8, column=4)
-        self.e9text = tk.StringVar()
-        self.e9 = tk.Entry(master, textvariable=self.e9text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e9.grid(row=9, column=4)
-        self.e10text = tk.StringVar()
-        self.e10 = tk.Entry(master, textvariable=self.e10text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e10.grid(row=10, column=4)
-        self.e11text = tk.StringVar()
-        self.e11 = tk.Entry(master, textvariable=self.e11text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e11.grid(row=11, column=4)
-
-        self.addmvcontbutton = tk.Button(self.theframe,
-                             text = 'Add MV(c)', command = self.addmvcontbuttonevent)
-        self.addmvcontbutton.grid(row = 7, column = 10, pady = 2, padx = 3, sticky = tk.NW)
-
-        self.deletemvcontbutton = tk.Button(self.theframe,
-                             text = 'Delete MV(c)', command = self.deletemvcontbuttonevent)
-        self.deletemvcontbutton.grid(row = 7, column = 11, pady = 2, padx = 3, sticky = tk.NW)
-
-        tk.Label(master, text='Current value').grid(row=8, column=10, sticky=tk.W)
-        tk.Label(master, text='Min').grid(row=9, column=10, sticky=tk.W)
-        tk.Label(master, text='Max').grid(row=10, column=10, sticky=tk.W)
-
-        self.e12text = tk.StringVar()
-        self.e12 = tk.Entry(master, textvariable=self.e12text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e12.grid(row=8, column=11)
-        self.e13text = tk.StringVar()
-        self.e13 = tk.Entry(master, textvariable=self.e13text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e13.grid(row=9, column=11)
-        self.e14text = tk.StringVar()
-        self.e14 = tk.Entry(master, textvariable=self.e14text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e14.grid(row=10, column=11)
-
-        tk.Label(master, text='MV List (h)').grid(row=11, column=10, sticky=tk.W)
-        tk.Label(master, text='MV Min').grid(row=11, column=11, sticky=tk.W)
-        tk.Label(master, text='MV Max').grid(row=11, column=12, sticky=tk.W)
-
-        self.listbox13 = tk.Listbox(master, width=globe.MeanWidthNMPCGUILB, exportselection=False)
-        self.listbox13.grid(row=12, column=10)
-        self.listbox13.bind('<<ListboxSelect>>', self.listbox13select)
-        self.listbox14 = tk.Listbox(master, width=5, exportselection=False)
-        self.listbox14.grid(row=12, column=11)
-        self.listbox15 = tk.Listbox(master, width=5, exportselection=False)
-        self.listbox15.grid(row=12, column=12)
-
-        self.addmvhybbutton = tk.Button(self.theframe,
-                             text = 'Add MV(h)', command = self.addmvhybbuttonevent)
-        self.addmvhybbutton.grid(row = 13, column = 10, pady = 2, padx = 3, sticky = tk.NW)
-
-        self.deletemvhybbutton = tk.Button(self.theframe,
-                             text = 'Delete MV(h)', command = self.deletemvhybbuttonevent)
-        self.deletemvhybbutton.grid(row = 13, column = 11, pady = 2, padx = 3, sticky = tk.NW)
-
-        tk.Label(master, text='Current value').grid(row=14, column=10, sticky=tk.W)
-        tk.Label(master, text='Min').grid(row=15, column=10, sticky=tk.W)
-        tk.Label(master, text='Max').grid(row=16, column=10, sticky=tk.W)
-
-        self.e15text = tk.StringVar()
-        self.e15 = tk.Entry(master, textvariable=self.e15text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e15.grid(row=14, column=11)
-        self.e16text = tk.StringVar()
-        self.e16 = tk.Entry(master, textvariable=self.e16text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e16.grid(row=15, column=11)
-        self.e17text = tk.StringVar()
-        self.e17 = tk.Entry(master, textvariable=self.e17text, width=globe.MeanWidthNMPCGUIEntry)
-        self.e17.grid(row=16, column=11)
+        self.listbox4.bind('<<ListboxSelect>>', self.listbox4select)
 
         return self.e0 # initial focus
 
@@ -208,56 +136,43 @@ class nmpcproperties(Dialog):
     def refreshdialogue(self):
         self.refreshmaindialogue()
 
-        self.refreshbaseclasslistpv()
-        self.refreshpropertylistdialoguepv()
-        self.refreshcvlist()
-        self.refreshbaseclasslistop()
-        self.refreshpropertylistdialogueop()
-        self.refreshmvlist()
+        self.refreshcontroldirection()
+        #refreshbaseclasslistpv()
+        #refreshpropertylistdialoguepv()
+        #refreshbaseclasslistop()
+        #refreshpropertylistdialogueop()
 
 
     def refreshmaindialogue(self):
-        self.e1text.set(str(self.thenmpc.N))
-        self.e2text.set(str(self.thenmpc.initialdelay))
-        self.e3text.set(str(self.thenmpc.runinterval))
-        self.e4text.set(str(self.thenmpc.alphak))
 
-        if self.baseclasstypepv == globe.baseclasstypeenum.UnitOp:
-            self.e5text.set(str(self.thesim.unitops[self.selectedbaseclasspv].selectedproperty(self.selectedpv).v))
-        elif self.baseclasstypepv == globe.baseclasstypeenum.Stream:
-            self.e5text.set(str(self.thesim.streams[self.selectedbaseclasspv - \
-                len(self.thesim.unitops)].selectedproperty(self.selectedpv).v))
-        else:
-            pass
+        self.e1text.set(str(self.thecontroller.K))
+        self.e2text.set(str(self.thecontroller.I))
+        self.e3text.set(str(self.thecontroller.D))
+        
+        self.e5text.set(self.thecontroller.pvname)
+        self.e6text.set(self.thecontroller.opname)
+        self.e7text.set(str(self.thecontroller.sp))
+        self.e12text.set(str(self.thecontroller.minpv))
+        self.e15text.set(str(self.thecontroller.maxpv))
+        self.e13text.set(str(self.thecontroller.minop))
+        self.e16text.set(str(self.thecontroller.maxop))
 
-        if (len(self.thenmpc.cvmaster) > 0):
-            self.e8text.set(str(self.thenmpc.cvmaster[self.selectedcv].target.v))
-            self.e9text.set(str(self.thenmpc.cvmaster[self.selectedcv].weight))
-            self.e10text.set(str(self.thenmpc.cvmaster[self.selectedcv].min))
-            self.e11text.set(str(self.thenmpc.cvmaster[self.selectedcv].max))
-        else:
-            self.e8text.set('')
-            self.e9text.set('')
-            self.e10text.set('')
-            self.e11text.set('')
+        if (self.thecontroller.pv != None):
+            self.e8text.set(str(self.thecontroller.pv.v))
+        if (self.thecontroller.op != None):
+            self.e9text.set(str(self.thecontroller.op.v))
+        if (self.thecontroller.pv != None and self.thecontroller.op != None):
+            self.thecontroller.init()
+            self.e10text.set(str(self.thecontroller.bias))
 
-        if (len(self.thenmpc.mvmaster) > 0):
-            self.e12text.set(str(self.thenmpc.mvmaster[self.selectedmv].var.v))
-            self.e13text.set(str(self.thenmpc.mvmaster[self.selectedmv].min))
-            self.e14text.set(str(self.thenmpc.mvmaster[self.selectedmv].max))
-        else:
-            self.e12text.set('')
-            self.e13text.set('')
-            self.e14text.set('')
 
-        if (len(self.thenmpc.mvboolmaster) > 0):
-            self.e15text.set(str(self.thenmpc.mvboolmaster[self.selectedboolmv].var.v))
-            self.e16text.set(str(self.thenmpc.mvboolmaster[self.selectedboolmv].min))
-            self.e17text.set(str(self.thenmpc.mvboolmaster[self.selectedboolmv].max))
-        else:
-            self.e15text.set('')
-            self.e15text.set('')
-            self.e15text.set('')
+    def refreshcontroldirection(self):
+        i = 0
+        for item in globe.piddirection:
+            self.listbox4.insert(tk.END, str(item))
+            if self.thecontroller.directionenum == item:
+                self.listbox4.selection_set(i)
+            i += 1
 
 
     def refreshbaseclasslistpv(self):
@@ -527,7 +442,7 @@ class nmpcproperties(Dialog):
         self.refreshmaindialogue()
 
     
-    def listbox8select(self, event=None):  #//Event handler for SelectedIndexChanged event for Main Object List for OPs
+    def listbox3select(self, event=None):  #//Event handler for SelectedIndexChanged event for Main Object List for OPs
         self.selectedbaseclassop = self.listbox8.curselection()[0]
         if self.selectedbaseclassop < len(self.thesim.unitops):
             self.baseclasstypeop = globe.baseclasstypeenum.UnitOp
@@ -536,6 +451,9 @@ class nmpcproperties(Dialog):
         else:
             self.baseclasstypeop = globe.baseclasstypeenum.Block
         self.refreshpropertylistdialogueop()
+
+    def listbox4select(self, event=None):
+        pass
 
 
     def listbox10select(self, event=None): #Event handler for MV (continuous) List selected index changed event.

@@ -1,7 +1,7 @@
 import globe as globe
 
 class controlvar(object):
-    def __init__(self, av = 0, aisbool = False):
+    def __init__(self, av = 0.0, aisbool = False):
         self.v = av;  #//The variable in this object that will have the PV or OP to be controlled in the simulation. 
         self.isbool = aisbool  #Is this a boolean variable?  Could then be part of a hybrid system.
         self.simvector = None #list() - will be a list of when it is initialised.

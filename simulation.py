@@ -8,6 +8,7 @@ from tee import tee
 from valve import valve
 from tank import tank
 from stream import stream
+from pidcontroller import pidcontroller
 
 
 class simulation(object):
@@ -131,15 +132,15 @@ class simulation(object):
         #    for i in range(len(simcopyfrom.signals)):
         #        self.signals[i].copyfrom(simcopyfrom.signals[i])
 
-        #if (len(self.pidcontrollers) == 0):
-        #    self.pidcontrollers = []
-        #    for i in range(len(simcopyfrom.pidcontrollers)):
-        #        obj = pidcontroller()
-        #        obj.copyfrom(simcopyfrom.pidcontrollers[i])
-        #        self.pidcontrollers.append(obj)
-        #else:
-        #    for i in range(len(simcopyfrom.pidcontrollers)):
-        #        self.pidcontrollers[i].copyfrom(simcopyfrom.pidcontrollers[i])
+        if (len(self.pidcontrollers) == 0):
+            self.pidcontrollers = []
+            for i in range(len(simcopyfrom.pidcontrollers)):
+                obj = pidcontroller()
+                obj.copyfrom(simcopyfrom.pidcontrollers[i])
+                self.pidcontrollers.append(obj)
+        else:
+            for i in range(len(simcopyfrom.pidcontrollers)):
+                self.pidcontrollers[i].copyfrom(simcopyfrom.pidcontrollers[i])
 
         #if (len(self.blocks) == 0):
         #    self.blocks = []
@@ -173,8 +174,9 @@ class simulation(object):
         for i in range(len(self.unitops)): self.unitops[i].draw(canvas)
         for i in range(len(self.streams)): self.streams[i].draw(canvas)
             #for (int i = 0; i < signals.Count; i++) { signals[i].draw(G); }
-            #for (int i = 0; i < pidcontrollers.Count; i++) { pidcontrollers[i].draw(G); }
-            #if (blocks != null) { for (int i = 0; i < blocks.Count; i++) { blocks[i].draw(G); } }
+        for i in range(len(self.pidcontrollers)): self.pidcontrollers[i].draw(canvas)
+        if (self.blocks != None):
+            for i in range(len(self.blocks)): self.blocks[i].draw(canvas)
         for i in range(len(self.nmpccontrollers)): self.nmpccontrollers[i].draw(canvas)
 
 

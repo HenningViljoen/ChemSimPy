@@ -4,7 +4,7 @@ from sklearn.neural_network import MLPRegressor
 import numpy as np
 
 
-class nmpcrlcritictransformer(BaseEstimator, TransformerMixin):
+class nmpcrl1critictransformer(BaseEstimator, TransformerMixin):
     
     def __init__(self):
         self.critic = MLPRegressor(hidden_layer_sizes=(100, 100, )) 

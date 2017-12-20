@@ -8,14 +8,22 @@ from nmpcproperties import nmpcproperties
 from nmpcrlsnapshot import nmpcrlsnapshot
 from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
-from nmpcrlactortransformer import nmpcrlactortransformer
-from nmpcrlcritictransformer import nmpcrlcritictransformer
+from nmpcrl1actortransformer import nmpcrl1actortransformer
+from nmpcrl1critictransformer import nmpcrl1critictransformer
+from nmpcrl2actornetwork import nmpcrl2actornetwork
+from nmpcrl2criticnetwork import nmpcrl2criticnetwork
+from nmpcrl2ornsteinuhlenbeckactionnoise import nmpcrl2ornsteinuhlenbeckactionnoise
+from nmpcrl2replaybuffer import nmpcrl2replaybuffer
+from scipy.optimize import minimize
 import sys
 import numpy as np
 import random
 from particle import particle
 import math
 import copy
+import argparse
+import pprint as pp
+import tensorflow as tf
 
 
 class nmpc(baseclass):
@@ -130,7 +138,14 @@ class nmpc(baseclass):
         #//Init depending on type of algorithm to be used:
         if (self.algorithm == globe.nmpcalgorithm.GeneticAlgorithm1): self.initgeneticalgorithm1()
         elif (self.algorithm == globe.nmpcalgorithm.ParticleSwarmOptimisation1): self.initparticleswarmoptimisation1()
-        elif (self.algorithm == globe.nmpcalgorithm.ReinforcementLearning): self.initrl()
+        elif (self.algorithm == globe.nmpcalgorithm.ReinforcementLearning1): self.initrl1()
+        elif (self.algorithm == globe.nmpcalgorithm.ReinforcementLearning2): pass #this one should only init once the 
+                                                                                #varialbes to controlled have been picked.
+        elif (self.algorithm == globe.nmpcalgorithm.SLSQP1): self.initslsqp1()
+
+
+    def initconditional(self):
+        if (self.algorithm == globe.nmpcalgorithm.ReinforcementLearning2): self.rl2init()
 
 
     #Unconstrained optimisation -------------------------------------------------------------------------------------------------------------
@@ -476,102 +491,414 @@ class nmpc(baseclass):
                 self.assignparticlefitness()
                 self.bestparticle()
                 self.implementparticle()
-            elif self.algorithm == globe.nmpcalgorithm.ReinforcementLearning:
-                self.updaterl()
+            elif self.algorithm == globe.nmpcalgorithm.ReinforcementLearning1:
+                self.updaterl1()
+            elif self.algorithm == globe.nmpcalgorithm.ReinforcementLearning2:
+                self.updaterl2()
+            elif self.algorithm == globe.nmpcalgorithm.SLSQP1:
+                self.updateslsqp1()
             #//for (int j = 0; j < mvmaster.Count; j++) //The mastersim's mv list will now be copied from the mvmatrix' first column.
             #//{
             #//    mvmaster[j].var.v = mvmatrix[j][1]; //T1 is the one to implement.  T0 is the current value.
             #//}
 
 
+# SLSQP1 algorithm
 
-# Reinforcement Learning algorithm -------------------------------------------------------------------------------------
-
-    def initrl(self):
-        self.rlbuffersize = self.controllerhistorylength*100
-        self.rlstatelength = len(self.cvmaster)*2
-        self.rlstatehalflength = len(self.cvmaster)
-        if self.rlstatelength == 0: self.rlstatelength = 2
-        self.rlactionlength = len(self.mvmaster)
-        if self.rlactionlength == 0: self.rlactionlength = 1
-        self.rlreward = 0.0 #in our case we are going to treat the reward signals at this stage as 
-        self.rlrewardtarget = np.zeros(self.rlbuffersize)
-        self.rlaction = np.zeros(self.rlactionlength) #the actions to be taken
-        self.rlstate = np.zeros(self.rlstatelength) #the states will be the CVs as well as their targets/setpoints. 
-                                                    #The first half othe state will be the set points, and then the CVs.
-        self.rlnewstate = self.rlstate = np.zeros(self.rlstatelength)
-        if len(self.cvmaster) > 0:
-            for i in range(self.rlstatehalflength): #will only init these SPs once the cv master list has been populated.
-                self.rlstate[i] = self.cvmaster[i].targetfracofrange()
-            for i in range(self.rlstatehalflength, self.rlstatelength):
-                self.rlstate[i] = self.cvmaster[i - self.rlstatehalflength].fracofrange()
+    def initslsqp1(self):
         if len(self.mvmaster) > 0:
-            for i in range(self.rlactionlength):
-                self.rlaction[i] = self.mvmaster[i].fracofrange()
-        colsinbuffer = self.rlstatelength + self.rlactionlength + 1 + self.rlstatelength #local int
-        self.rlbuffer = np.zeros((self.rlbuffersize, colsinbuffer)) #at this point the buffer will just be as large as the simulation horison, will be changed later.
-        self.rlbuffershort = np.zeros((self.rlbuffersize, self.rlstatelength + self.rlactionlength))
-        self.rlbufferstate = np.zeros((self.rlbuffersize, self.rlstatelength))
-            #this is the buffer that will be used to fit the critic with in part
-        self.y = np.zeros(self.rlbuffersize) #the list calculated rewards from the samples N from buffer R
-        self.actoroutputsimvector = np.zeros((self.rlbuffersize, self.rlactionlength))
-        self.rlcritictransformer = nmpcrlcritictransformer()
-        self.rlcritic = self.rlcritictransformer.critic
-        self.rlcriticoutputsimvector = np.zeros(self.rlbuffersize) 
-        self.rlcriticcoefs = None
-        self.rlcritic.fit(np.zeros((5,self.rlstatelength + self.rlactionlength)), np.zeros((5,1)).reshape(-1, 1))
-        self.rlactortransformer = nmpcrlactortransformer(self.rlstatehalflength, self.rlstatelength)
-        self.rlactor = self.rlactortransformer.actor
-        self.rlactor.fit(np.zeros((5,self.rlstatelength)), np.zeros((5,self.rlactionlength)))
-        self.rlactorcoefs = None
+            self.slsqp1mvs = np.zeros(len(self.mvmaster))
+            #print(self.slsqp1mvs)
+            #print(self.slsqp1mvs[0])
+            #print(self.mvmaster[0].var.v)
+            #print(len(self.mvmaster))
+            for i in range(len(self.mvmaster)):
+                self.slsqp1mvs[i] = self.mvmaster[i].var.v
+            self.slsqp1bounds = [(self.mvmaster[i].min, self.mvmaster[i].max) for i in range(len(self.mvmaster))]
+
+
+    def objectivefuncslsqp1(self, x, sign=1.0):
+        oldmv = [0.0]*len(self.mvmaster)
+
+        for j in range(len(self.mvmaster)):
+            oldmv[j] = self.mvmaster[j].var.v
+            self.mvmaster[j].var.v = x[j]
+
+        J = self.calcfitnessga1()
+        for j in range(len(self.mvmaster)):
+            self.mvmaster[j].var.v = oldmv[j]
+        return J
+
+
+    def objectivefuncslsqp1deriv(self, x, sign=1.0):
+        self.weights = x
+        Jac = np.zeros(len(self.mvmaster)) #local Jacobian copy
+
+        J0 = self.objectivefuncslsqp1(x)
+        for i in range(len(self.mvmaster)):
+            x[i] += globe.Epsilon
+            J1 = self.objectivefuncslsqp1(x)
+            Jac[i] = (J1 - J0)/globe.Epsilon
+
+        return Jac
+
+
+    def updateslsqp1(self):
+        result = minimize(self.objectivefuncslsqp1, self.slsqp1mvs, args=(), \
+                       jac=self.objectivefuncslsqp1deriv, \
+                       bounds=self.slsqp1bounds, method='SLSQP', options={'disp': True})
+        #print(self.slsqp1mvs)
+        #print(self.mvmaster)
+        for i in range(len(self.mvmaster)):
+            self.slsqp1mvs[i] += (result.x[i] - self.slsqp1mvs[i])*self.alphak
+            self.mvmaster[i].var.v = self.slsqp1mvs[i]
+
+
+# Reinforcement Learning algorithm 2-------------------------------------------------------------------------------------
+
+    def build_summariesrl2(self):      #Tensorflow Summary Ops
+        episode_reward = tf.Variable(0.)
+        tf.summary.scalar("Reward", episode_reward)
+        episode_ave_max_q = tf.Variable(0.)
+        tf.summary.scalar("Qmax Value", episode_ave_max_q)
+
+        summary_vars = [episode_reward, episode_ave_max_q]
+        summary_ops = tf.summary.merge_all()
+
+        return summary_ops, summary_vars
+
+
+    def updaterl2(self):
+        self.trainrl2loop(self.sess, self.env, self.args, self.actor, self.critic, self.actor_noise)
+
+
+    def calcrewardrl2(self):
+        tempr = 0.0 #this reward is actually an objective to be minimised.
+        for j in range(len(self.cvmaster)):
+            tempr -= self.cvmaster[j].weight * \
+                        math.pow((self.cvmaster[j].var.v - self.cvmaster[j].target.v) / \
+                        (self.cvmaster[j].max - self.cvmaster[j].min + globe.Epsilon),2)  #make reward negative
+                                                                                            #since it assumed we are 
+        if tempr > -self.rl2_epsilon:
+            self.r = self.rl2r_c
+        else:
+            self.r = tempr                                                                                
+            
+
+    def rl2initmorestate(self):
+        #self.rl1buffersize = self.controllerhistorylength*100
+        self.rl2statelength = len(self.cvmaster)*3
+        self.rl2state1thirdlength = len(self.cvmaster) #End of targets
+        self.rl2state2thirdlength = len(self.cvmaster)*2 #End of current state, before new state
+        if self.rl2statelength == 0: self.rl2statelength = 3
+        self.rl2actionlength = len(self.mvmaster)
+        if self.rl2actionlength == 0: self.rl2actionlength = 1
+        self.r = 0.0 #in our case we are going to treat the reward signals at this stage as 
+        self.rl2_epsilon = 0.0 #the abs value difference between SP and PV below which c will be the reward.
+        self.rl2r_c = 0.0 #the positive value that will be given as reward when the PV is with Epsilon of SP
+        #self.rl2rewardtarget = np.zeros(self.rl2buffersize)
+        self.rl2action = np.zeros(self.rl2actionlength) #the actions to be taken
+        self.s = np.zeros(self.rl2statelength) #the states will be the CVs as well as their targets/setpoints. 
+                                                    #The first half othe state will be the set points, and then the CVs.
+        self.s2 = np.zeros(self.rl2statelength)
+        if len(self.cvmaster) > 0:
+            for i in range(self.rl2state1thirdlength): #will only init these SPs once the cv master list has been populated.
+                self.s[i] = self.cvmaster[i].targetfracofrange()
+            for i in range(self.rl2state1thirdlength, self.rl2state2thirdlength):
+                self.s[i] = self.cvmaster[i - self.rl2state1thirdlength].fracofrange()
+            for i in range(self.rl2state2thirdlength, self.rl2statelength):
+                self.s[i] = self.cvmaster[i - self.rl2state2thirdlength].fracofrange() #new states for now just 
+                                                                                            #equal to old states.   
+        self.s2 = np.copy(self.s)
+
+
+    def trainrl2loop(self, sess, env, args, actor, critic, actor_noise):  #Agent Training
+
+        if self.controlleri%int(args['max_episode_len']) == 0:
+
+            #s = env.reset()
+
+            self.ep_reward = 0.0
+            self.ep_ave_max_q = 0.0
+
+        if args['render_env']:
+            env.render()
+
+        #self.s2, self.r, terminal, info = env.step(a[0])
+
+        for i in range(self.rl2state2thirdlength, self.rl2statelength):
+            self.s2[i - self.rl2state1thirdlength] = self.s2[i]  #set old state to new state
+            self.s2[i] = self.cvmaster[i - self.rl2state2thirdlength].fracofrange() #update to latest CV info
+
+        self.calcrewardrl2()
+        self.rl2rewardsimvect.append(self.r)
+
+        terminal = self.controlleri == int(args['max_episodes'])*int(args['max_episode_len'])
+
+        self.replay_buffer.add(np.reshape(self.s, (actor.s_dim,)), np.reshape(self.a, (actor.a_dim,)), self.r,
+                        terminal, np.reshape(self.s2, (actor.s_dim,)))
+
+        # Keep adding experience to the memory until
+        # there are at least minibatch size samples
+        if self.replay_buffer.size() > int(args['minibatch_size']):
+            s_batch, a_batch, r_batch, t_batch, s2_batch = \
+                self.replay_buffer.sample_batch(int(args['minibatch_size']))
+
+        # Calculate targets
+            target_q = critic.predict_target(\
+                s2_batch, actor.predict_target(s2_batch))
+
+            y_i = []
+            for k in range(int(args['minibatch_size'])):
+                if t_batch[k]:
+                    y_i.append(r_batch[k])
+                else:
+                    y_i.append(r_batch[k] + critic.gamma * target_q[k])
+
+            # Update the critic given the targets
+            predicted_q_value, _ = critic.train(
+                s_batch, a_batch, np.reshape(y_i, (int(args['minibatch_size']), 1)))
+
+            self.ep_ave_max_q += np.amax(predicted_q_value)
+
+            # Update the actor policy using the sampled gradient
+            a_outs = actor.predict(s_batch)
+            grads = critic.action_gradients(s_batch, a_outs)
+            actor.train(s_batch, grads[0])
+
+            # Update target networks
+            actor.update_target_network()
+            critic.update_target_network()
+
+        self.s = np.copy(self.s2)
+        self.ep_reward += self.r
+
+        
+        if terminal:
+            summary_str = sess.run(self.summary_ops, feed_dict={
+                summary_vars[0]: self.ep_reward,
+                summary_vars[1]: self.ep_ave_max_q / float(j)
+            })
+
+            self.writer.add_summary(summary_str, i)
+            self.writer.flush()
+
+            print('| Reward: {:d} | Episode: {:d} | Qmax: {:.4f}'.format(int(ep_reward), \
+                i, (ep_ave_max_q / float(j))))
+            #break
+
+        # Added exploration noise
+        #a = actor.predict(np.reshape(s, (1, 3))) + (1. / (1. + i))
+        self.a = actor.predict(np.reshape(self.s, (1, actor.s_dim))) + actor_noise()
+        self.rl2action = self.a[0]
+        for i in range(self.rl2actionlength):
+            self.rl2action[i] = 0.5*(self.rl2action[i] + 1.0) #transformation of the actor NN output to 0 to 1 space.
+            if self.rl2action[i] > 1.0: self.rl2action[i] = 1.0
+            elif self.rl2action[i] < 0.0: self.rl2action[i] = 0.0
+            self.mvmaster[i].var.v = self.mvmaster[i].rangetoeu(self.rl2action[i])
+
+
+    def trainrl2(self, sess, env, args, actor, critic, actor_noise):  #Agent Training
+
+        # Set up summary Ops
+        self.summary_ops, self.summary_vars = self.build_summariesrl2()
+
+        sess.run(tf.global_variables_initializer())
+        self.writer = tf.summary.FileWriter(args['summary_dir'], sess.graph)
+
+        # Initialize target network weights
+        actor.update_target_network()
+        critic.update_target_network()
+
+        # Initialize replay memory
+        self.rl2buffersize = int(args['buffer_size'])
+        self.replay_buffer = nmpcrl2replaybuffer(int(args['buffer_size']), int(args['random_seed']))
+        self.rl2rewardsimvect = list() #np.zeros(self.rl2buffersize)
+        self.a = actor.predict(np.reshape(self.s, (1, actor.s_dim))) + actor_noise() #init self.a
         
 
 
-    def updaterl(self):
+    def mainrl2(self, args):
+        try:
+            if self.sess != None: self.sess.close()
+        except:
+            print('No self.sess object yet.')
+        self.sess = tf.Session()
+        #with self.sess as sess:
+
+        #env = gym.make(args['env'])
+        env = None
+        np.random.seed(int(args['random_seed']))
+        tf.set_random_seed(int(args['random_seed']))
+        #env.seed(int(args['random_seed']))
+
+        self.rl2initmorestate()
+
+        #state_dim = env.observation_space.shape[0]
+        state_dim = self.rl2statelength
+        #action_dim = env.action_space.shape[0]
+        action_dim = self.rl2actionlength
+        #action_bound = env.action_space.high
+        action_bound = 1.0
+        # Ensure action bound is symmetric
+        #assert (env.action_space.high == -env.action_space.low)
+
+        actor = nmpcrl2actornetwork(self.sess, state_dim, action_dim, action_bound,
+                             float(args['actor_lr']), float(args['tau']),
+                             int(args['minibatch_size']))
+
+        critic = nmpcrl2criticnetwork(self.sess, state_dim, action_dim,
+                               float(args['critic_lr']), float(args['tau']),
+                               float(args['gamma']),
+                               actor.get_num_trainable_vars())
+        
+        actor_noise = nmpcrl2ornsteinuhlenbeckactionnoise(mu=np.zeros(action_dim))
+
+        if env != None:
+            if args['use_gym_monitor']:
+                if not args['render_env']:
+                    env = wrappers.Monitor(
+                        env, args['monitor_dir'], video_callable=False, force=True)
+                else:
+                    env = wrappers.Monitor(env, args['monitor_dir'], force=True)
+
+
+        self.env = env
+        self.args = args
+        self.actor = actor
+        self.critic = critic
+        self.actor_noise = actor_noise
+        self.trainrl2(self.sess, self.env, self.args, self.actor, self.critic, self.actor_noise)
+
+        if args['use_gym_monitor']:
+            env.monitor.close()
+
+    
+    def rl2init(self):
+        parser = argparse.ArgumentParser(description='provide arguments for DDPG agent')
+
+        # agent parameters
+        parser.add_argument('--actor-lr', help='actor network learning rate', default=0.0001)
+        parser.add_argument('--critic-lr', help='critic network learning rate', default=0.001)
+        parser.add_argument('--gamma', help='discount factor for critic updates', default=0.99)
+        parser.add_argument('--tau', help='soft target update parameter', default=0.001)
+        parser.add_argument('--buffer-size', help='max size of the replay buffer', default=1000000)
+        parser.add_argument('--minibatch-size', help='size of minibatch for minibatch-SGD', default=64)
+
+        # run parameters
+        parser.add_argument('--env', help='choose the gym env- tested on {Pendulum-v0}', default='Pendulum-v0')
+        parser.add_argument('--random-seed', help='random seed for repeatability', default=1234)
+        parser.add_argument('--max-episodes', help='max num of episodes to do while training', default=50000)
+        parser.add_argument('--max-episode-len', help='max length of 1 episode', default=1000)
+        parser.add_argument('--render-env', help='render the gym env', action='store_true')
+        parser.add_argument('--use-gym-monitor', help='record gym results', action='store_true')
+        parser.add_argument('--monitor-dir', help='directory for storing gym results', default='./results/gym_ddpg')
+        parser.add_argument('--summary-dir', help='directory for storing tensorboard info', default='./results/tf_ddpg')
+
+        parser.set_defaults(render_env=False)
+        #parser.set_defaults(use_gym_monitor=True)
+        parser.set_defaults(use_gym_monitor=False)
+    
+        args = vars(parser.parse_args())
+    
+        pp.pprint(args)
+
+        self.mainrl2(args)
+
+
+# Reinforcement Learning algorithm 1-------------------------------------------------------------------------------------
+
+    def initrl1(self):
+        self.rl1buffersize = self.controllerhistorylength*100
+        self.rl1statelength = len(self.cvmaster)*3
+        self.rl1state1thirdlength = len(self.cvmaster) #End of targets
+        self.rl1state2thirdlength = len(self.cvmaster)*2 #End of current state, before new state
+        if self.rl1statelength == 0: self.rl1statelength = 3
+        self.rl1actionlength = len(self.mvmaster)
+        if self.rl1actionlength == 0: self.rl1actionlength = 1
+        self.rl1reward = 0.0 #in our case we are going to treat the reward signals at this stage as 
+        self.rl1rewardtarget = np.zeros(self.rl1buffersize)
+        self.rl1action = np.zeros(self.rl1actionlength) #the actions to be taken
+        self.rl1state = np.zeros(self.rl1statelength) #the states will be the CVs as well as their targets/setpoints. 
+                                                    #The first half othe state will be the set points, and then the CVs.
+        self.rl1newstate = np.zeros(self.rl1statelength)
+        if len(self.cvmaster) > 0:
+            for i in range(self.rl1state1thirdlength): #will only init these SPs once the cv master list has been populated.
+                self.rl1state[i] = self.cvmaster[i].targetfracofrange()
+            for i in range(self.rl1state1thirdlength, self.rl1state2thirdlength):
+                self.rl1state[i] = self.cvmaster[i - self.rl1state1thirdlength].fracofrange()
+            for i in range(self.rl1state2thirdlength, self.rl1statelength):
+                self.rl1state[i] = self.cvmaster[i - self.rl1state2thirdlength].fracofrange() #new states for now just 
+                                                                                            #equal to old states.   
+        self.rl1newstate = np.copy(self.rl1state)
+        if len(self.mvmaster) > 0:
+            for i in range(self.rl1actionlength):
+                self.rl1action[i] = self.mvmaster[i].fracofrange()
+        colsinbuffer = self.rl1statelength + self.rl1actionlength + 1 + self.rl1statelength #local int
+        self.rl1buffer = np.zeros((self.rl1buffersize, colsinbuffer)) #at this point the buffer will just be as large as the simulation horison, will be changed later.
+        self.rl1buffershort = np.zeros((self.rl1buffersize, self.rl1statelength + self.rl1actionlength))
+        self.rl1bufferstate = np.zeros((self.rl1buffersize, self.rl1statelength))
+            #this is the buffer that will be used to fit the critic with in part
+        self.y = np.zeros(self.rl1buffersize) #the list calculated rewards from the samples N from buffer R
+        self.actoroutputsimvector1 = np.zeros((self.rl1buffersize, self.rl1actionlength))
+        self.rl1critictransformer = nmpcrl1critictransformer()
+        self.rl1critic = self.rl1critictransformer.critic
+        self.rl1criticoutputsimvector = np.zeros(self.rl1buffersize) 
+        self.rl1criticcoefs = None
+        self.rl1critic.fit(np.zeros((5,self.rl1statelength + self.rl1actionlength)), np.zeros((5,1)).reshape(-1, 1))
+        self.rl1actortransformer = nmpcrl1actortransformer(self.rl1state1thirdlength, self.rl1statelength)
+        self.rl1actor = self.rl1actortransformer.actor
+        self.rl1actor.fit(np.zeros((5,self.rl1statelength)), np.zeros((5,self.rl1actionlength)))
+        self.rl1actorcoefs = None
+        
+
+
+    def updaterl1(self):
         print(self.controlleri)
-        self.calcrewardrl()
-        for i in range(self.rlstatehalflength, self.rlstatelength):
-            self.rlnewstate[i] = self.cvmaster[i - self.rlstatehalflength].fracofrange()
-        self.rlbuffer[self.controlleri,:] = np.hstack((self.rlstate, self.rlaction, self.rlreward, self.rlnewstate))
-        self.rlbuffershort[self.controlleri,:] = np.hstack((self.rlstate, self.rlaction))
-        self.rlbufferstate[self.controlleri,:] = self.rlstate
-        criticpredictfory = self.rlcritic.predict(np.hstack((self.rlnewstate, self.rlactor.predict(self.rlnewstate))))
-        self.y[self.controlleri] = self.rlreward + globe.RLGamma*criticpredictfory
-        self.rlcriticoutputsimvector[self.controlleri] = criticpredictfory
+        self.calcrewardrl1()
+        for i in range(self.rl1state2thirdlength, self.rl1statelength):
+            self.rl1newstate[i - self.rl1state1thirdlength] = self.rl1newstate[i]  #set old state to new state
+            self.rl1newstate[i] = self.cvmaster[i - self.rl1state2thirdlength].fracofrange() #update to latest CV info
+        self.rl1buffer[self.controlleri,:] = np.hstack((self.rl1state, self.rl1action, self.rl1reward, self.rl1newstate))
+        self.rl1buffershort[self.controlleri,:] = np.hstack((self.rl1state, self.rl1action))
+        self.rl1bufferstate[self.controlleri,:] = self.rl1state
+        criticpredictfory = self.rl1critic.predict(np.hstack((self.rl1newstate, self.rl1actor.predict(self.rl1newstate))))
+        self.y[self.controlleri] = self.rl1reward + globe.RLGamma*criticpredictfory
+        self.rl1criticoutputsimvector[self.controlleri] = criticpredictfory
             
-        self.rlcriticcoefs = np.array(self.rlcritic.coefs_)
-        self.rlcritic.fit(self.rlbuffershort[:(self.controlleri+1)], self.y[:(self.controlleri+1)])
+        self.rl1criticcoefs = np.array(self.rl1critic.coefs_)
+        self.rl1critic.fit(self.rl1buffershort[:(self.controlleri+1)], self.y[:(self.controlleri+1)])
         print('delta rlcritic.coefs_ :')
-        print(np.array(self.rlcritic.coefs_) - self.rlcriticcoefs)
-        self.rlrewardtarget[self.controlleri] = 0.0 #at this stage we are aming to get the objective func to zero
-        self.rlpipe = Pipeline([ \
-            ('rlactortransformer', self.rlactortransformer), \
-            ('rlcritictransformer', self.rlcritictransformer) ])
-        self.rlactorcoefs = np.array(self.rlactor.coefs_)
-        self.rlpipe.fit(self.rlbufferstate[:(self.controlleri+1),:], \
-            np.hstack((self.rlrewardtarget[:(self.controlleri+1)].reshape(-1, 1), \
-            np.zeros((self.controlleri+1, self.rlstatelength + self.rlactionlength - 1)))))
+        print(np.array(self.rl1critic.coefs_) - self.rl1criticcoefs)
+        self.rl1rewardtarget[self.controlleri] = 0.0 #at this stage we are aming to get the objective func to zero
+        self.rl1pipe = Pipeline([ \
+            ('rlactortransformer', self.rl1actortransformer), \
+            ('rlcritictransformer', self.rl1critictransformer) ])
+        self.rl1actorcoefs = np.array(self.rl1actor.coefs_)
+        self.rl1pipe.fit(self.rl1bufferstate[:(self.controlleri+1),:], \
+            np.hstack((self.rl1rewardtarget[:(self.controlleri+1)].reshape(-1, 1), \
+            np.zeros((self.controlleri+1, self.rl1statelength + self.rl1actionlength - 1)))))
         print('delta rlactor.coefs_ :')
-        print(np.array(self.rlactor.coefs_) - self.rlactorcoefs)
+        print(np.array(self.rl1actor.coefs_) - self.rl1actorcoefs)
         #self.controlleri
 
         #The below part of this method, will now focus on getting the action from the actor.
-        self.rlaction = self.rlactor.predict(self.rlnewstate)
-        self.actoroutputsimvector[self.controlleri, :] = self.rlaction
-        for i in range(self.rlactionlength):
-            self.rlaction[i] += np.random.normal()/48.0
+        self.rl1action = self.rl1actor.predict(self.rl1newstate)
+        self.actoroutputsimvector1[self.controlleri, :] = self.rl1action
+        for i in range(self.rl1actionlength):
+            self.rl1action[i] += np.random.normal()/48.0
             #print(self.rlaction[i])
-            if self.rlaction[i] > 1.0: self.rlaction[i] = 1.0
-            elif self.rlaction[i] < 0.0: self.rlaction[i] = 0.0
-            self.mvmaster[i].var.v = self.mvmaster[i].rangetoeu(self.rlaction[i])
+            if self.rl1action[i] > 1.0: self.rl1action[i] = 1.0
+            elif self.rl1action[i] < 0.0: self.rl1action[i] = 0.0
+            self.mvmaster[i].var.v = self.mvmaster[i].rangetoeu(self.rl1action[i])
 
-        self.rlstate = np.copy(self.rlnewstate)
+        self.rl1state = np.copy(self.rl1newstate)
 
 
-    def calcrewardrl(self):
-        self.rlreward = 0.0 #this reward is actually an objective to be minimised.
+    def calcrewardrl1(self):
+        self.rl1reward = 0.0 #this reward is actually an objective to be minimised.
         for j in range(len(self.cvmaster)):
-            self.rlreward += self.cvmaster[j].weight * \
+            self.rl1reward += self.cvmaster[j].weight * \
                         math.pow((self.cvmaster[j].var.v - self.cvmaster[j].target.v) / \
                         (self.cvmaster[j].max - self.cvmaster[j].min + globe.Epsilon), 2) 
 
@@ -1150,14 +1477,21 @@ class nmpc(baseclass):
 
     def dodetailtrend(self, plt):
         if self.detailtrended:
-            x = range(self.rlbuffersize)
-            f, axarr = plt.subplots(3, sharex=True)
-            axarr[0].plot(x, self.y)
-            axarr[0].set_title('y signal history : ' + self.name)
-            axarr[1].plot(x, self.actoroutputsimvector)
-            axarr[1].set_title('actoroutputsimvector : ' + self.name)
-            axarr[2].plot(x, self.rlcriticoutputsimvector)
-            axarr[2].set_title('rlcriticoutputsimvector : ' + self.name)
+            if self.algorithm == globe.nmpcalgorithm.ReinforcementLearning1:
+                x = range(self.rl1buffersize)
+                f, axarr = plt.subplots(3, sharex=True)
+                axarr[0].plot(x, self.y)
+                axarr[0].set_title('y signal history : ' + self.name)
+                axarr[1].plot(x, self.actoroutputsimvector1)
+                axarr[1].set_title('actoroutputsimvector1 : ' + self.name)
+                axarr[2].plot(x, self.rl1criticoutputsimvector)
+                axarr[2].set_title('rl1criticoutputsimvector : ' + self.name)
+            elif self.algorithm == globe.nmpcalgorithm.ReinforcementLearning2:
+                x = range(len(self.rl2rewardsimvect))
+                f, axarr = plt.subplots(3, sharex=True)
+                axarr[0].plot(x, self.rl2rewardsimvect )
+                axarr[0].set_title('self.rl2rewardsimvect ')
+
 
 
     def setproperties(self, asim, aroot):  #public override void setproperties(root, simulation asim)

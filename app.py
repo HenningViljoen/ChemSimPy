@@ -9,6 +9,7 @@ from mixer import mixer
 from pump import pump
 from coolingtower import coolingtower
 from nmpc import nmpc
+from pidcontroller import pidcontroller
 import globe as globe
 import point as point
 import stream as stream
@@ -29,7 +30,7 @@ from matplotlib import pyplot as plt
 
 #unitops that can be used on the pfd.
 pfdunitops = {'Edit' : 1, 'Stream' : 2, 'Valve' : 3, 'HXSimple' : 4, 'Tank' : 5, 'Tee' : 6, 'Mixer' : 7, 'Pump' : 8, \
-    'CT' : 9, 'NMPC' : 10}
+    'CT' : 9, 'NMPC' : 10, 'PID' : 11}
 
 #class definition ------------------------------------------------------------------------------------------------------
 
@@ -130,24 +131,31 @@ class application(tk.Frame):
                                     row =15, column = 0,
                                     sticky = tk.NW,
                                     )
+        tk.Radiobutton(self.leftFrame,
+                    text = 'PID',
+                    variable = self.radiobuttonValue,
+                    value = pfdunitops['PID']).grid(padx = 3, pady = 2,
+                                    row =16, column = 0,
+                                    sticky = tk.NW,
+                                    )
         
                      
         self.buttonsimfast = tk.Button(self.leftFrame, text = "SimFast",
                                       command = self.simfast)
         self.buttonsimfast.grid(padx = 3, pady = 2,
-                                    row = 16, column = 0,
+                                    row = 17, column = 0,
                                     sticky = tk.NW)
 
         self.buttonsave = tk.Button(self.leftFrame, text = "Save",
                                       command = self.save)
         self.buttonsave.grid(padx = 3, pady = 2,
-                                    row = 17, column = 0,
+                                    row = 18, column = 0,
                                     sticky = tk.NW)
 
         self.buttonopen = tk.Button(self.leftFrame, text = "Open",
                                       command = self.open)
         self.buttonopen.grid(padx = 3, pady = 2,
-                                    row=18, column = 0,
+                                    row=19, column = 0,
                                     sticky = tk.NW)
 #----------------------------------------------------------------------
         #self.myCanvas = tk.Canvas(self, width = 800,
@@ -210,7 +218,8 @@ class application(tk.Frame):
             elif self.radiobuttonValue.get() == pfdunitops['Pump']: self.addnewpump(xonplant, yonplant)
             elif self.radiobuttonValue.get() == pfdunitops['CT']: self.addnewcoolingtower(xonplant, yonplant)
             elif self.radiobuttonValue.get() == pfdunitops['NMPC']: self.addnewnmpccontroller(xonplant, yonplant)
-            
+            elif self.radiobuttonValue.get() == pfdunitops['PID']: self.addnewpidcontroller(xonplant, yonplant)
+
             elif self.radiobuttonValue.get() == pfdunitops['Stream']:
                 dynamicpoint = None #point object
                 if self.dmode == globe.drawingmode.Streams:     #//Already drawing one stream
@@ -265,6 +274,8 @@ class application(tk.Frame):
                     if (self.sim.streams[i].highlighted): self.popup(event)
                 for i in range(len(self.sim.nmpccontrollers)):
                     if (self.sim.nmpccontrollers[i].highlighted): self.popup(event)
+                for i in range(len(self.sim.pidcontrollers)):
+                    if (self.sim.pidcontrollers[i].highlighted): self.popup(event)
 
 
     def mousemoveleftbutton(self, event):
@@ -333,6 +344,17 @@ class application(tk.Frame):
                         #}
                     else:
                         self.sim.nmpccontrollers[i].highlighted = False
+                for i in range(len(self.sim.pidcontrollers)):
+                    if (self.sim.pidcontrollers[i].mouseover(xonplant, yonplant)):
+                        self.sim.pidcontrollers[i].highlighted = True
+                        #if (e.Button == System.Windows.Forms.MouseButtons.Left)
+                        #{
+                        #    sim.nmpccontrollers[i].location.x = (pointerx - global.OriginX) / global.GScale;
+                        #    sim.nmpccontrollers[i].location.y = (pointery - global.OriginY) / global.GScale;
+                        #}
+                    else:
+                        self.sim.pidcontrollers[i].highlighted = False
+
             elif self.radiobuttonValue.get() == pfdunitops['Stream']:  # //Stream button
                 for i in range(len(self.sim.unitops)):
                     for j in range(self.sim.unitops[i].nin):
@@ -396,6 +418,12 @@ class application(tk.Frame):
     def addnewnmpccontroller(self, xonplant, yonplant):
         self.sim.nmpccontrollers.append(nmpc(len(self.sim.unitops), xonplant, yonplant, self.sim))
             #//public nmpc(int anr, double ax, double ay)
+
+
+    def addnewpidcontroller(self, xonplant, yonplant):
+        self.sim.pidcontrollers.append(pidcontroller(len(self.sim.unitops), xonplant, yonplant, globe.PIDControllerInitK, \
+            globe.PIDControllerInitI, globe.PIDControllerInitD, globe.PIDControllerInitMinPV, globe.PIDControllerInitMinPV,\
+            globe.PIDControllerInitMaxPV, globe.PIDControllerInitMinOP, globe.PIDControllerInitMaxOP))
 
 
     def handlestopevent(self):
@@ -473,6 +501,10 @@ class application(tk.Frame):
         for i in range(len(self.sim.nmpccontrollers)):
             if (self.sim.nmpccontrollers[i].highlighted):
                 self.sim.nmpccontrollers[i].setproperties(self.sim, root)
+
+        for i in range(len(self.sim.pidcontrollers)):
+            if (self.sim.pidcontrollers[i].highlighted):
+                self.sim.pidcontrollers[i].setproperties(self.sim, root)
 
 
     def detailtrend(self):

@@ -55,7 +55,9 @@ class nmpcalgorithm(Enum):
     ActiveSet1 = 3
     GeneticAlgorithm1 = 4
     ParticleSwarmOptimisation1 = 5
-    ReinforcementLearning = 6
+    ReinforcementLearning1 = 6
+    ReinforcementLearning2 = 7
+    SLSQP1 = 8 #this is the ScyPy Minimize implementation that uses SLSQP1.
 
 
 @unique
@@ -84,6 +86,10 @@ class objecttypes(Enum):
     ControlMVSignalSplitter = 22
 
 
+@unique
+class piddirection(Enum):
+    Direct = -1
+    Reverse = 1
 
 
 
@@ -127,14 +133,14 @@ AirDensity = 1.225 #; //kg/m^3
 
 #Timing constants 
 TimerInterval = 1 #; // micro seconds
-SpeedUpFactor = 200.0 #; //50, CT and normal sim: 200; //factor  Heat exchangers: 30000
+SpeedUpFactor = 200 #; //50, CT and normal sim: 200; //factor  Heat exchangers: 30000
 SampleT = calcSampleT() #; //Function returns a value since then reader can see which function it is.
 SimVectorUpdateT = 1.0 #; //CT: 1.0; //seconds; HX: 30s; normal sim with cooling tower: 1s.
 SimVectorUpdatePeriod = int(round(SimVectorUpdateT / SampleT)) #; //Nr. samples between saving in vect.
 TrendUpdateT = 1.0 #; //seconds.  The simulation period of updating trends in simulation.  
                                                  #//; HX: 30s; normal sim with cooling tower: 1s.
 TrendUpdateIterPeriod = int(round(TrendUpdateT / SampleT)) #; //Nr. of samples between update trend.
-SimTime = 600.0 #; // Normal one shot: 3600.0*1.  Normal full model: 3600.0*4 ; CT alone:  64830; //seconds 3600*1;//3600*24;  135: ES004 53340 ; for 172EP004: 34440;for CT fitting: 12 hours/3hours.
+SimTime = 3600.0 #; // Normal one shot: 3600.0*1.  Normal full model: 3600.0*4 ; CT alone:  64830; //seconds 3600*1;//3600*24;  135: ES004 53340 ; for 172EP004: 34440;for CT fitting: 12 hours/3hours.
 SimIterations = calcSimIterations() #; //Nr of iterations of the simulation.
 SimVectorLength = calcSimVectorLength() #;
 PlantDataSampleT = 30.0 #; //30 seconds for CT;  The sample frequency of the IP.21 data used for fitting.
@@ -559,10 +565,10 @@ NMPCWidth = 2.0 #m
 NMPCHeight = 2.0 #m
 DefaultN = 9000 #3000; //Default Optimisation horison 80
 DefaultInitialDelay = 0
-DefaultRunInterval = 300 #Assuming TSample is 10 sec, so then the interval would be a multiple of 
+DefaultRunInterval = 5*60*5 #Assuming TSample is 10 sec, so then the interval would be a multiple of 
                                                     #//that.
-Defaultalphak = 1.0 #0.1; //0.1   0.001; //How much of line search delta is implemented.
-DefaultNMPCAlgorithm = nmpcalgorithm.ReinforcementLearning #nmpcalgorithm.ParticleSwarmOptimisation1; //nmpcalgorithm.UnconstrainedLineSearch;
+Defaultalphak = 0.5 #0.1; //0.1   0.001; //How much of line search delta is implemented.
+DefaultNMPCAlgorithm = nmpcalgorithm.SLSQP1 #nmpcalgorithm.ParticleSwarmOptimisation1; //nmpcalgorithm.UnconstrainedLineSearch;
 DefaultNMPCSigma = 0.8 #Multiplier of mubarrier for each iteration of the nmpc algorithm.
 MeanWidthNMPCGUILB = 11
 MeanWidthNMPCGUIEntry = 11
@@ -607,7 +613,7 @@ RLGamma = 0.2 #0.95 #discount factor for RL agent
 Direct = -1
 Reverse = 1
 PIDControllerInitRadius = 0.4; #//m
-IDControllerInitK = 1.0
+PIDControllerInitK = 1.0
 PIDControllerInitI = 100.0
 PIDControllerInitD = 0.0
 PIDControllerInitMinOP = 0.0 #Engineering units.

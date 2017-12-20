@@ -4,10 +4,10 @@ from sklearn.neural_network import MLPRegressor
 import numpy as np
 
 
-class nmpcrlactortransformer(BaseEstimator, TransformerMixin):
+class nmpcrl1actortransformer(BaseEstimator, TransformerMixin):
     
-    def __init__(self, astatehalflength, astatelength):
-        self.statehalflength = astatehalflength
+    def __init__(self, astate1thirdlength, astatelength):
+        self.state1thirdlength = astate1thirdlength
         self.statelength = astatelength
         self.actor = MLPRegressor(hidden_layer_sizes=(100, 100, ))
     
